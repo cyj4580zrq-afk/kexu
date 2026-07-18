@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f6f7f9">
+  <title>课序</title>
+  <link rel="stylesheet" href="./vendor/element-plus.css">
+  <link rel="stylesheet" href="./app.css">
+</head>
+<body>
+  <div id="app" v-cloak>
+    <main
+      class="app-shell"
+      :class="{ bouncing: pullOffset > 0 }"
+      :style="{ transform: `translateY(${pullOffset}px)` }"
+      @touchstart="handlePullStart"
+      @touchmove="handlePullMove"
+      @touchend="handlePullEnd"
+    >
+      <section v-if="activeTab === 'schedule'" class="page home-page">
+        <header class="home-header">
+          <div>
+            <p class="home-date">{{ dateText }}</p>
+            <h1>{{ greeting }}</h1>
+          </div>
+          <button class="avatar-button" type="button" aria-label="打开设置" @click="activeTab = 'settings'">课</button>
+        </header>
+
+        <div class="home-week-row">
+          <button type="button" @click="openWeekSheet('view')">
+            <span>第 {{ selectedWeek }} 周</span>
+            <app-icon name="ChevronDown" :size="15"></app-icon>
+          </button>
+          <span>{{ todayLabel }} · {{ todayCourses.length }} 门课</span>
+        </div>
+
+        <section v-if="focusCourse" class="focus-panel" @click="openCourse(focusCourse)">
+          <div class="focus-topline">
+            <span><i></i>{{ focusCourseStatus }}</span>
+            <em>{{ focusCourse.day }}</em>
+          </div>
+          <h2>{{ focusCourse.name }}</h2>
+          <div class="focus-meta">
+            <span><app-icon name="Clock3" :size="17"></app-icon>{{ formatCourseTime(focusCourse.time) }}</span>
+            <span><app-icon name="MapPin" :size="17"></app-icon>{{ focusCourse.location || '地点待定' }}</span>
+          </div>
+          <div class="focus-footer">
+            <span>{{ focusCourse.teacher || '教师待定' }}</span>
+            <button type="button" aria-label="查看课程详情"><app-icon name="ArrowUpRight" :size="18"></app-icon></button>
+          </div>
+        </section>
+
+        <section v-else class="focus-panel free-day">
+          <span class="free-icon"><app-icon name="Coffee" :size="25"></app-icon></span>
+          <div><p>今天没有课程</p><h2>把时间留给自己</h2></div>
+        </section>
+
+        <div class="home-section-heading">
+          <div><h2>{{ homeScope === 'today' ? '今日安排' : '本周课程' }}</h2><span>{{ homeCourses.length ? '按上课时间排序' : '暂无课程' }}</span></div>
+          <button type="button" @click="openAllCourses">全部课表<app-icon name="ChevronRight" :size="16"></app-icon></button>
+        </div>
+
+        <div v-if="homeCourses.length" class="today-list">
+          <button v-for="course in homeCourses" :key="course.id" type="button" @click="openCourse(course)">
+            <span class="today-time">{{ shortCourseTime(course.time) }}</span>
+            <span class="today-line" :style="{ background: accentColor }"></span>
+            <span class="today-copy"><strong>{{ course.name }}</strong><small>{{ course.location || '地点待定' }}</small></span>
+            <app-icon name="ChevronRight" :size="17"></app-icon>
+          </button>
+        </div>
+        <div v-else class="home-empty-line">今天没有更多安排</div>
+
+        <button class="all-schedule-button" type="button" @click="openAllCourses">
+          <span><app-icon name="CalendarDays" :size="20"></app-icon>查看全部课程</span>
+          <app-icon name="ArrowRight" :size="19"></app-icon>
+        </button>
+      </section>
+
+      <section v-else-if="activeTab === 'allCourses'" class="page schedule-page secondary-page">
+        <header class="topbar">
+          <button class="back-button" type="button" aria-label="返回首页" @click="activeTab = 'schedule'">
+            <app-icon name="ChevronLeft" :size="22"></app-icon>
+          </button>
+          <div class="secondary-title"><h1>全部课表</h1><p>第 {{ selectedWeek }} 周</p></div>
+          <button class="icon-button" type="button" aria-label="添加课程" @click="openAddCourse"><app-icon name="Plus" :size="21"></app-icon></button>
+        </header>
+
+        <div class="week-control">
+          <button class="week-arrow" type="button" aria-label="上一周" :disabled="selectedWeek <= 1" @click="changeWeek(-1)">
+            <app-icon name="ChevronLeft" :size="19"></app-icon>
+          </button>
+          <button class="week-display" type="button" @click="openWeekSheet('view')">
+            <span>教学周</span>
+            <strong>第 {{ selectedWeek }} 周</strong>
+            <app-icon name="ChevronDown" :size="16"></app-icon>
+          </button>
+          <button class="week-arrow" type="button" aria-label="下一周" :disabled="selectedWeek >= 30" @click="changeWeek(1)">
+            <app-icon name="ChevronRight" :size="19"></app-icon>
+          </button>
+        </div>
+
+        <nav class="day-strip" aria-label="按星期筛选">
+          <button
+            v-for="day in visibleDayOptions"
+            :key="day.value"
+            type="button"
+            :class="['day-button', { active: selectedDay === day.value }]"
+            @click="selectedDay = day.value"
+          >
+            <span>{{ day.short }}</span>
+            <strong>{{ day.value === '全部' ? visibleCourseCount : getDayCount(day.value) }}</strong>
+          </button>
+        </nav>
+
+        <div class="schedule-summary">
+          <div>
+            <strong>{{ selectedDay === '全部' ? '本周安排' : selectedDay }}</strong>
+            <span>{{ visibleCourseCount }} 门课程</span>
+          </div>
+          <button type="button" class="text-action" @click="selectedDay = todayLabel">今天</button>
+        </div>
+
+        <div v-if="groupedCourses.length" class="course-groups">
+          <section v-for="group in groupedCourses" :key="group.day" class="course-group">
+            <div class="group-heading">
+              <strong>{{ group.day }}</strong>
+              <span>{{ group.courses.length }} 门</span>
+            </div>
+            <button
+              v-for="course in group.courses"
+              :key="course.id"
+              type="button"
+              :class="['course-row', { finished: isCourseFinished(course) }]"
+              @click="openCourse(course)"
+            >
+              <span class="course-accent"></span>
+              <span class="course-main">
+                <span class="course-title-line">
+                  <strong>{{ course.name }}</strong>
+                  <em v-if="isCourseFinished(course)">已结课</em>
+                </span>
+                <span class="course-meta">
+                  <span><app-icon name="Clock3" :size="15"></app-icon>{{ formatCourseTime(course.time) }}</span>
+                  <span><app-icon name="MapPin" :size="15"></app-icon>{{ course.location || '地点待定' }}</span>
+                </span>
+                <span class="course-weeks">{{ normalizeWeekRange(course.weekRange) }}</span>
+              </span>
+              <app-icon name="ChevronRight" :size="18" class="row-chevron"></app-icon>
+            </button>
+          </section>
+        </div>
+
+        <div v-else class="empty-state">
+          <span class="empty-icon"><app-icon name="CalendarX2" :size="30"></app-icon></span>
+          <h2>这一天没有课程</h2>
+          <p>切换星期或教学周查看其他安排</p>
+        </div>
+
+      </section>
+
+      <section v-else-if="activeTab === 'sync'" class="page standard-page">
+        <header class="page-header">
+          <div>
+            <p class="brand-line">WHCIBE</p>
+            <h1>同步课表</h1>
+          </div>
+          <span :class="['server-dot', schoolStatus.type]">{{ schoolStatus.text }}</span>
+        </header>
+
+        <div class="sync-intro">
+          <span class="sync-mark"><app-icon name="RefreshCw" :size="24"></app-icon></span>
+          <div>
+            <strong>武汉纺织大学外经贸学院</strong>
+            <p>{{ lastSyncText }}</p>
+          </div>
+        </div>
+
+        <form class="form-stack" @submit.prevent="syncFromSchool">
+          <label class="field-label" for="student-id">教务系统学号</label>
+          <div class="input-shell">
+            <app-icon name="UserRound" :size="19"></app-icon>
+            <input id="student-id" v-model.trim="syncForm.username" inputmode="numeric" autocomplete="username" placeholder="请输入学号">
+          </div>
+
+          <label class="field-label" for="student-password">教务系统密码</label>
+          <div class="input-shell">
+            <app-icon name="LockKeyhole" :size="19"></app-icon>
+            <input
+              id="student-password"
+              v-model="syncForm.password"
+              :type="showPassword ? 'text' : 'password'"
+              autocomplete="current-password"
+              placeholder="请输入密码"
+            >
+            <button type="button" class="input-icon" :aria-label="showPassword ? '隐藏密码' : '显示密码'" @click="showPassword = !showPassword">
+              <app-icon :name="showPassword ? 'EyeOff' : 'Eye'" :size="19"></app-icon>
+            </button>
+          </div>
+
+          <label class="field-label" for="semester">学期</label>
+          <div class="input-shell select-shell">
+            <app-icon name="CalendarRange" :size="19"></app-icon>
+            <select id="semester" v-model="syncForm.semester">
+              <option v-for="semester in semesterOptions" :key="semester.value" :value="semester.value">{{ semester.label }}</option>
+            </select>
+            <app-icon name="ChevronDown" :size="17"></app-icon>
+          </div>
+
+          <button class="primary-button" type="submit" :disabled="syncLoading">
+            <app-icon :name="syncLoading ? 'LoaderCircle' : 'RefreshCw'" :size="20" :class="{ spinning: syncLoading }"></app-icon>
+            {{ syncLoading ? syncStep : '登录并同步课表' }}
+          </button>
+        </form>
+
+        <div class="privacy-note">
+          <app-icon name="ShieldCheck" :size="18"></app-icon>
+          <p>密码仅用于本次连接教务系统，不会保存在手机中。同步完成后会自动保存课表快照。</p>
+        </div>
+
+        <details class="fallback-import">
+          <summary>教务系统无法连接时</summary>
+          <p>可粘贴教务课表页面源码，离线解析课程。</p>
+          <textarea v-model="importHtml" rows="5" placeholder="粘贴完整课表页面源码"></textarea>
+          <button type="button" class="secondary-button" @click="importFromHtml">解析并导入</button>
+        </details>
+      </section>
+
+      <section v-else-if="activeTab === 'history'" class="page standard-page">
+        <header class="page-header">
+          <div>
+            <p class="brand-line">BACKUP</p>
+            <h1>同步记录</h1>
+          </div>
+        </header>
+
+        <div v-if="syncHistory.length" class="history-list">
+          <article v-for="record in syncHistory" :key="record.id" class="history-row">
+            <span class="history-icon"><app-icon name="CloudDownload" :size="20"></app-icon></span>
+            <div class="history-copy">
+              <strong>{{ record.source || '教务系统同步' }}</strong>
+              <span>{{ formatDate(record.syncedAt) }} · {{ record.courseCount }} 门课程</span>
+              <small>{{ record.semester || '未标注学期' }}</small>
+            </div>
+            <button type="button" class="restore-button" @click="restoreSnapshot(record)">恢复</button>
+          </article>
+        </div>
+        <div v-else class="empty-state history-empty">
+          <span class="empty-icon"><app-icon name="History" :size="30"></app-icon></span>
+          <h2>还没有同步记录</h2>
+          <p>每次成功同步后，这里会保留一份课表</p>
+          <button class="secondary-button compact" type="button" @click="activeTab = 'sync'">去同步</button>
+        </div>
+      </section>
+
+      <section v-else class="page standard-page">
+        <header class="page-header">
+          <div>
+            <p class="brand-line">PREFERENCES</p>
+            <h1>设置</h1>
+          </div>
+        </header>
+
+        <div class="settings-group">
+          <h2>课表</h2>
+          <button type="button" class="setting-row" @click="openWeekSheet('current')">
+            <span class="setting-icon blue"><app-icon name="CalendarRange" :size="19"></app-icon></span>
+            <span><strong>当前教学周</strong><small>用于判断课程是否结课</small></span>
+            <em>第 {{ currentWeek }} 周</em>
+            <app-icon name="ChevronRight" :size="18"></app-icon>
+          </button>
+          <div class="setting-row">
+            <span class="setting-icon green"><app-icon name="PanelTop" :size="19"></app-icon></span>
+            <span><strong>首页课程范围</strong><small>决定首页显示哪些课程</small></span>
+            <div class="mini-segment">
+              <button type="button" :class="{ active: homeScope === 'today' }" @click="homeScope = 'today'">今天</button>
+              <button type="button" :class="{ active: homeScope === 'week' }" @click="homeScope = 'week'">本周</button>
+            </div>
+          </div>
+          <div class="setting-row">
+            <span class="setting-icon cyan"><app-icon name="CalendarOff" :size="19"></app-icon></span>
+            <span><strong>显示周末</strong><small>在完整课表中显示周六、周日</small></span>
+            <label class="switch"><input v-model="showWeekends" type="checkbox"><span></span></label>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <h2>外观</h2>
+          <div class="setting-row">
+            <span class="setting-icon violet"><app-icon name="SunMoon" :size="19"></app-icon></span>
+            <span><strong>主题模式</strong><small>可跟随手机系统</small></span>
+            <div class="mini-segment theme-segment">
+              <button type="button" :class="{ active: themeMode === 'system' }" @click="themeMode = 'system'">自动</button>
+              <button type="button" :class="{ active: themeMode === 'light' }" @click="themeMode = 'light'">浅色</button>
+              <button type="button" :class="{ active: themeMode === 'dark' }" @click="themeMode = 'dark'">深色</button>
+            </div>
+          </div>
+          <div class="setting-row color-setting">
+            <span class="setting-icon orange"><app-icon name="Palette" :size="19"></app-icon></span>
+            <span><strong>强调色</strong><small>选择你喜欢的界面颜色</small></span>
+            <div class="color-swatches" aria-label="选择强调色">
+              <button v-for="color in accentOptions" :key="color" type="button" :aria-label="'选择强调色 ' + color" :style="{ background: color }" :class="{ active: accentColor === color }" @click="accentColor = color"><app-icon v-if="accentColor === color" name="Check" :size="13"></app-icon></button>
+            </div>
+          </div>
+          <div class="setting-row">
+            <span class="setting-icon blue"><app-icon name="Rows3" :size="19"></app-icon></span>
+            <span><strong>紧凑课程卡片</strong><small>一屏显示更多课程</small></span>
+            <label class="switch"><input v-model="compactCards" type="checkbox"><span></span></label>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <h2>交互</h2>
+          <div class="setting-row">
+            <span class="setting-icon pink"><app-icon name="Waves" :size="19"></app-icon></span>
+            <span><strong>下拉回弹</strong><small>页面顶部的弹性反馈</small></span>
+            <label class="switch"><input v-model="bounceEnabled" type="checkbox"><span></span></label>
+          </div>
+          <div class="setting-row">
+            <span class="setting-icon amber"><app-icon name="Vibrate" :size="19"></app-icon></span>
+            <span><strong>触感反馈</strong><small>重要操作时轻微振动</small></span>
+            <label class="switch"><input v-model="hapticsEnabled" type="checkbox"><span></span></label>
+          </div>
+        </div>
+
+        <div class="settings-group danger-group">
+          <h2>数据</h2>
+          <button type="button" class="setting-row" @click="clearCourses">
+            <span class="setting-icon red"><app-icon name="Trash2" :size="19"></app-icon></span>
+            <span><strong>清空课程</strong><small>同步记录不会被删除</small></span>
+            <app-icon name="ChevronRight" :size="18"></app-icon>
+          </button>
+          <button type="button" class="setting-row" @click="resetPreferences">
+            <span class="setting-icon gray"><app-icon name="RotateCcw" :size="19"></app-icon></span>
+            <span><strong>恢复默认设置</strong><small>不会删除课程和同步记录</small></span>
+            <app-icon name="ChevronRight" :size="18"></app-icon>
+          </button>
+        </div>
+
+        <p class="version-text">课序 Android 0.3.2</p>
+      </section>
+    </main>
+
+    <nav v-if="activeTab !== 'allCourses'" class="bottom-nav" aria-label="应用导航">
+      <button v-for="tab in tabs" :key="tab.value" type="button" :class="{ active: activeTab === tab.value }" @click="activeTab = tab.value">
+        <app-icon :name="tab.icon" :size="22"></app-icon>
+        <span>{{ tab.label }}</span>
+      </button>
+    </nav>
+
+    <div v-if="weekSheetVisible" class="sheet-overlay" @click.self="weekSheetVisible = false">
+      <section class="bottom-sheet week-sheet">
+        <div class="sheet-handle"></div>
+        <header><h2>{{ weekSheetMode === 'current' ? '设置当前教学周' : '选择查看周次' }}</h2><button type="button" aria-label="关闭" @click="weekSheetVisible = false"><app-icon name="X" :size="21"></app-icon></button></header>
+        <div class="week-grid">
+          <button v-for="week in 30" :key="week" type="button" :class="{ active: (weekSheetMode === 'current' ? currentWeek : selectedWeek) === week }" @click="selectWeek(week)">第 {{ week }} 周</button>
+        </div>
+      </section>
+    </div>
+
+    <div v-if="detailVisible && activeCourse" class="sheet-overlay" @click.self="detailVisible = false">
+      <section class="bottom-sheet detail-sheet">
+        <div class="sheet-handle"></div>
+        <header><h2>课程详情</h2><button type="button" aria-label="关闭" @click="detailVisible = false"><app-icon name="X" :size="21"></app-icon></button></header>
+        <div class="detail-title">
+          <span :class="{ finished: isCourseFinished(activeCourse) }"></span>
+          <div><h3>{{ activeCourse.name }}</h3><p>{{ activeCourse.teacher || '教师待定' }}</p></div>
+          <em v-if="isCourseFinished(activeCourse)">已结课</em>
+        </div>
+        <dl class="detail-list">
+          <div><dt><app-icon name="Clock3" :size="18"></app-icon>上课时间</dt><dd>{{ activeCourse.day }} · {{ formatCourseTime(activeCourse.time) }}</dd></div>
+          <div><dt><app-icon name="MapPin" :size="18"></app-icon>上课地点</dt><dd>{{ activeCourse.location || '地点待定' }}</dd></div>
+          <div><dt><app-icon name="CalendarRange" :size="18"></app-icon>上课周次</dt><dd>{{ normalizeWeekRange(activeCourse.weekRange) }}</dd></div>
+        </dl>
+        <button type="button" class="danger-button" @click="deleteCourse(activeCourse.id)"><app-icon name="Trash2" :size="18"></app-icon>删除课程</button>
+      </section>
+    </div>
+
+    <div v-if="addVisible" class="sheet-overlay" @click.self="addVisible = false">
+      <section class="bottom-sheet add-sheet">
+        <div class="sheet-handle"></div>
+        <header><h2>添加课程</h2><button type="button" aria-label="关闭" @click="addVisible = false"><app-icon name="X" :size="21"></app-icon></button></header>
+        <form class="form-stack" @submit.prevent="addCourse">
+          <label class="field-label">课程名称</label><div class="input-shell"><input v-model.trim="courseForm.name" placeholder="例如：高等数学"></div>
+          <div class="form-pair">
+            <div><label class="field-label">星期</label><div class="input-shell select-shell"><select v-model="courseForm.day"><option v-for="day in weekDays" :key="day" :value="day">{{ day }}</option></select><app-icon name="ChevronDown" :size="17"></app-icon></div></div>
+            <div><label class="field-label">节次</label><div class="input-shell"><input v-model.trim="courseForm.time" placeholder="第 1-2 节"></div></div>
+          </div>
+          <label class="field-label">地点</label><div class="input-shell"><input v-model.trim="courseForm.location" placeholder="例如：教学楼 A205"></div>
+          <label class="field-label">上课周次</label><div class="input-shell"><input v-model.trim="courseForm.weekRange" placeholder="例如：1-16周"></div>
+          <button class="primary-button" type="submit">保存课程</button>
+        </form>
+      </section>
+    </div>
+
+    <div v-if="exitConfirmVisible" class="dialog-overlay" @click.self="exitConfirmVisible = false">
+      <section class="exit-dialog" role="dialog" aria-modal="true" aria-labelledby="exit-title">
+        <span class="exit-dialog-icon"><app-icon name="LogOut" :size="23"></app-icon></span>
+        <h2 id="exit-title">退出课序？</h2>
+        <p>课程和同步记录均已保存在本机。</p>
+        <div class="exit-dialog-actions">
+          <button type="button" @click="exitConfirmVisible = false">继续使用</button>
+          <button type="button" class="confirm-exit" @click="exitApplication">退出应用</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script src="./vendor/vue.global.prod.js"></script>
+  <script src="./vendor/element-plus.full.min.js"></script>
+  <script src="./vendor/capacitor.js"></script>
+  <script src="./vendor/jsencrypt.min.js"></script>
+  <script src="./vendor/lucide.min.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

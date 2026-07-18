@@ -1,0 +1,2194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CampusFlow 课程表管理系统</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
+  <style>
+    :root {
+      --bg: #f4f8fc;
+      --bg-elevated: rgba(255, 255, 255, 0.82);
+      --surface: rgba(255, 255, 255, 0.9);
+      --surface-strong: #ffffff;
+      --surface-soft: #eef5ff;
+      --text: #10233f;
+      --text-secondary: #57708f;
+      --border: rgba(132, 165, 207, 0.18);
+      --border-strong: rgba(82, 132, 201, 0.22);
+      --primary: #2f80ff;
+      --primary-soft: rgba(47, 128, 255, 0.12);
+      --finished: #ff5f57;
+      --finished-soft: rgba(255, 95, 87, 0.14);
+      --finished-border: rgba(255, 95, 87, 0.28);
+      --shadow: 0 24px 80px rgba(21, 71, 145, 0.10);
+      --shadow-soft: 0 16px 40px rgba(17, 62, 123, 0.08);
+      --timeline-dot: #8ab7ff;
+      --page-glow: radial-gradient(circle at top left, rgba(98, 164, 255, 0.22), transparent 32%),
+        radial-gradient(circle at top right, rgba(177, 220, 255, 0.6), transparent 26%);
+      --el-color-primary: #2f80ff;
+      --el-border-radius-base: 16px;
+      --el-font-family: "Plus Jakarta Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+      --el-bg-color: #ffffff;
+      --el-bg-color-overlay: #ffffff;
+      --el-fill-color-blank: #ffffff;
+      --el-text-color-primary: #10233f;
+      --el-text-color-regular: #57708f;
+      --el-border-color-light: rgba(132, 165, 207, 0.18);
+      --el-border-color-lighter: rgba(132, 165, 207, 0.1);
+      --el-mask-color: rgba(12, 22, 36, 0.38);
+
+      --el-table-border-color: var(--border);
+      --el-table-border: 1px solid var(--border);
+      --el-table-text-color: var(--text);
+      --el-table-header-text-color: var(--text-secondary);
+      --el-table-row-hover-bg-color: var(--surface-soft);
+      --el-table-current-row-bg-color: var(--primary-soft);
+      --el-table-header-bg-color: var(--surface-soft);
+      --el-table-bg-color: var(--surface-strong);
+      --el-table-tr-bg-color: var(--surface-strong);
+      --el-table-expanded-cell-bg-color: var(--surface-strong);
+    }
+
+    body.dark-mode {
+      --bg: #07111f;
+      --bg-elevated: rgba(10, 22, 40, 0.82);
+      --surface: rgba(12, 26, 47, 0.88);
+      --surface-strong: #10233d;
+      --surface-soft: rgba(39, 86, 153, 0.18);
+      --text: #edf5ff;
+      --text-secondary: #9bb5d1;
+      --border: rgba(120, 161, 219, 0.18);
+      --border-strong: rgba(122, 174, 255, 0.26);
+      --primary: #66a3ff;
+      --primary-soft: rgba(102, 163, 255, 0.15);
+      --finished: #ff7d73;
+      --finished-soft: rgba(255, 125, 115, 0.16);
+      --finished-border: rgba(255, 125, 115, 0.3);
+      --shadow: 0 28px 88px rgba(0, 0, 0, 0.34);
+      --shadow-soft: 0 18px 50px rgba(0, 0, 0, 0.22);
+      --timeline-dot: #66a3ff;
+      --page-glow: radial-gradient(circle at top left, rgba(58, 110, 197, 0.28), transparent 34%),
+        radial-gradient(circle at top right, rgba(22, 43, 78, 0.88), transparent 24%);
+      --el-color-primary: #66a3ff;
+      --el-bg-color: #10233d;
+      --el-bg-color-overlay: #122844;
+      --el-fill-color-blank: #10233d;
+      --el-text-color-primary: #edf5ff;
+      --el-text-color-regular: #9bb5d1;
+      --el-border-color-light: rgba(120, 161, 219, 0.18);
+      --el-border-color-lighter: rgba(120, 161, 219, 0.1);
+      --el-mask-color: rgba(4, 10, 18, 0.52);
+      color-scheme: dark;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Plus Jakarta Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+      transition: background 0.35s ease, color 0.35s ease;
+    }
+
+    body {
+      background-image: var(--page-glow);
+      background-attachment: fixed;
+    }
+
+    button,
+    input,
+    textarea {
+      font: inherit;
+    }
+
+    #app {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .page-shell {
+      width: min(1380px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 24px 0 32px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 18px 22px;
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      background: var(--bg-elevated);
+      backdrop-filter: blur(18px);
+      box-shadow: var(--shadow-soft);
+      position: sticky;
+      top: 16px;
+      z-index: 20;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-weight: 800;
+      background: linear-gradient(135deg, #2f80ff, #73b0ff);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 12px 24px rgba(47, 128, 255, 0.24);
+      flex: 0 0 auto;
+    }
+
+    .brand-text {
+      min-width: 0;
+    }
+
+    .brand-title {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .brand-subtitle {
+      margin: 3px 0 0;
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .nav-chip {
+      border: 1px solid transparent;
+      color: var(--text-secondary);
+      padding: 10px 16px;
+      border-radius: 999px;
+      background: transparent;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.25s ease;
+    }
+
+    .nav-chip.active,
+    .nav-chip:hover {
+      color: var(--primary);
+      background: var(--primary-soft);
+      border-color: var(--border-strong);
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 22px;
+      margin-top: 24px;
+      align-items: stretch;
+    }
+
+    .hero-panel,
+    .hero-stats {
+      position: relative;
+      overflow: hidden;
+      border-radius: 30px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+
+    .hero-panel {
+      padding: 34px;
+    }
+
+    .hero-panel::before,
+    .hero-stats::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.36), transparent 40%);
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      color: var(--primary);
+      background: var(--primary-soft);
+      font-size: 0.88rem;
+      font-weight: 700;
+    }
+
+    .hero-title {
+      margin: 18px 0 14px;
+      font-size: clamp(2rem, 3vw, 3.8rem);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    .hero-desc {
+      margin: 0;
+      max-width: 640px;
+      color: var(--text-secondary);
+      font-size: 1rem;
+      line-height: 1.75;
+    }
+
+    .hero-toolbar {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-top: 30px;
+    }
+
+    .hero-stats {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .stat-card {
+      padding: 18px;
+      border-radius: 22px;
+      background: var(--surface-strong);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .stat-label {
+      color: var(--text-secondary);
+      font-size: 0.88rem;
+      margin-bottom: 10px;
+    }
+
+    .stat-value {
+      font-size: 1.7rem;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .stat-note {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+
+    .focus-card {
+      padding: 18px 20px;
+      border-radius: 24px;
+      background: linear-gradient(135deg, rgba(47, 128, 255, 0.16), rgba(255, 255, 255, 0.04));
+      border: 1px solid var(--border-strong);
+    }
+
+    .focus-label {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      margin-bottom: 10px;
+    }
+
+    .focus-course {
+      font-size: 1.08rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .focus-meta {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      line-height: 1.7;
+    }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr);
+      gap: 22px;
+      margin-top: 24px;
+    }
+
+    .panel {
+      border-radius: 28px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(16px);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 24px 24px 14px;
+    }
+
+    .panel-title {
+      margin: 0;
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+
+    .panel-subtitle {
+      margin: 6px 0 0;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+
+    .timeline-panel {
+      padding-bottom: 18px;
+    }
+
+    .timeline-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 0 16px 16px;
+    }
+
+    .timeline-item {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      width: 100%;
+      border: 1px solid transparent;
+      border-radius: 22px;
+      padding: 16px;
+      background: transparent;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      color: inherit;
+    }
+
+    .timeline-item:hover,
+    .timeline-item.active {
+      background: var(--surface-strong);
+      border-color: var(--border);
+      box-shadow: var(--shadow-soft);
+      transform: translateY(-1px);
+    }
+
+    .timeline-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      background: var(--timeline-dot);
+      box-shadow: 0 0 0 6px var(--primary-soft);
+      margin-top: 6px;
+      flex: 0 0 auto;
+    }
+
+    .timeline-item.active .timeline-dot {
+      background: var(--primary);
+    }
+
+    .timeline-content {
+      min-width: 0;
+      text-align: left;
+    }
+
+    .timeline-day {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .timeline-date {
+      margin-top: 4px;
+      color: var(--text-secondary);
+      font-size: 0.88rem;
+    }
+
+    .timeline-count {
+      margin-top: 10px;
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+
+    .content-panel {
+      padding-bottom: 10px;
+    }
+
+    .content-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 0 24px 16px;
+    }
+
+    .content-toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .schedule-grid {
+      padding: 0 24px 24px;
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      align-items: stretch;
+    }
+
+    .schedule-sections {
+      padding: 0 24px 24px;
+      display: grid;
+      gap: 20px;
+    }
+
+    .schedule-section {
+      display: grid;
+      gap: 14px;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 14px 18px;
+      border-radius: 20px;
+      background: var(--surface-soft);
+      border: 1px solid var(--border);
+    }
+
+    .section-title {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    .section-subtitle {
+      margin: 4px 0 0;
+      font-size: 0.86rem;
+      color: var(--text-secondary);
+    }
+
+    .section-count {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: var(--surface-strong);
+      color: var(--primary);
+      font-size: 0.82rem;
+      font-weight: 800;
+      border: 1px solid var(--border);
+    }
+
+    .course-card {
+      position: relative;
+      overflow: hidden;
+      border-radius: 24px;
+      padding: 22px;
+      background: var(--surface-strong);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-soft);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-height: 220px;
+      transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+    }
+
+    .course-card::after {
+      content: "";
+      position: absolute;
+      top: -40px;
+      right: -30px;
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(47, 128, 255, 0.16), transparent 62%);
+      pointer-events: none;
+    }
+
+    .course-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 24px 50px rgba(37, 85, 157, 0.14);
+      border-color: var(--border-strong);
+    }
+
+    .course-card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .course-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      font-size: 0.82rem;
+      font-weight: 700;
+      width: fit-content;
+    }
+
+    .course-name {
+      margin: 0;
+      font-size: 1.28rem;
+      font-weight: 800;
+      line-height: 1.2;
+      color: var(--text);
+    }
+
+    .course-teacher {
+      color: var(--text-secondary);
+      font-size: 0.92rem;
+      margin-top: 6px;
+    }
+
+    .course-meta {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: auto;
+    }
+
+    .course-meta-item {
+      padding: 12px 14px;
+      border-radius: 18px;
+      background: var(--surface-soft);
+      min-height: 70px;
+    }
+
+    .course-meta-label {
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      margin-bottom: 8px;
+    }
+
+    .course-meta-value {
+      color: var(--text);
+      font-size: 0.94rem;
+      font-weight: 700;
+      line-height: 1.45;
+    }
+
+    .course-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 2px;
+    }
+
+    .course-time-pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 40px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(15, 30, 52, 0.05);
+      color: var(--text);
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+
+    .course-week-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .course-end-pill,
+    .week-status-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      padding: 8px 11px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 800;
+    }
+
+    .course-end-pill {
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+      background: var(--surface-soft);
+    }
+
+    .week-status-badge {
+      color: var(--primary);
+      background: var(--primary-soft);
+      border: 1px solid var(--border-strong);
+    }
+
+    .week-picker {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 240px;
+    }
+
+    .week-picker-label {
+      flex: 0 0 auto;
+      color: var(--text-secondary);
+      font-size: 0.88rem;
+      font-weight: 700;
+    }
+
+    body.dark-mode .course-time-pill {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    /* Finished course styles */
+    .course-card.is-finished {
+      background: linear-gradient(135deg, var(--finished-soft), rgba(255, 255, 255, 0.02));
+      border-color: var(--finished-border);
+      box-shadow: 0 18px 42px rgba(255, 95, 87, 0.14);
+    }
+
+    .course-card.is-finished::after {
+      background: linear-gradient(135deg, rgba(255, 95, 87, 0.22), transparent 62%);
+    }
+
+    .course-card.is-finished:hover {
+      border-color: var(--finished);
+      box-shadow: 0 22px 46px rgba(255, 95, 87, 0.18);
+    }
+
+    .finished-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 32px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: var(--finished);
+      color: #fff;
+      font-size: 0.78rem;
+      font-weight: 800;
+      box-shadow: 0 10px 24px rgba(255, 95, 87, 0.24);
+    }
+
+    body.dark-mode .finished-badge {
+      color: #fff6f5;
+    }
+
+    .empty-state {
+      margin: 0 24px 24px;
+      padding: 46px 24px;
+      border-radius: 24px;
+      border: 1px dashed var(--border-strong);
+      background: linear-gradient(180deg, rgba(47, 128, 255, 0.08), rgba(255, 255, 255, 0.02));
+      text-align: center;
+      color: var(--text-secondary);
+    }
+
+    .detail-block {
+      display: grid;
+      gap: 12px;
+    }
+
+    .detail-row {
+      border-radius: 18px;
+      background: var(--surface-soft);
+      padding: 14px 16px;
+    }
+
+    .detail-row-label {
+      color: var(--text-secondary);
+      font-size: 0.82rem;
+      margin-bottom: 7px;
+    }
+
+    .detail-row-value {
+      color: var(--text);
+      font-size: 0.95rem;
+      line-height: 1.65;
+      font-weight: 600;
+    }
+
+    .dialog-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      width: 100%;
+    }
+
+    .el-button,
+    .el-input__wrapper,
+    .el-textarea__inner,
+    .el-select__wrapper,
+    .el-dialog,
+    .el-segmented {
+      border-radius: 16px;
+    }
+
+    .el-dialog {
+      background: var(--surface-strong);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+    }
+
+    .el-dialog__title,
+    .el-message-box__title {
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    .el-dialog__body,
+    .el-message-box__content,
+    .el-form-item__label {
+      color: var(--text-secondary);
+    }
+
+    .el-overlay-dialog {
+      backdrop-filter: blur(10px);
+    }
+
+    /* Settings Panel */
+    .settings-panel {
+      max-width: 700px;
+      margin: 24px auto;
+      padding: 34px;
+    }
+
+    .history-panel {
+      margin-top: 24px;
+      padding-bottom: 24px;
+    }
+
+    .history-list {
+      display: grid;
+      gap: 14px;
+      padding: 0 24px;
+    }
+
+    .history-card {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: center;
+      padding: 20px;
+      border-radius: 22px;
+      border: 1px solid var(--border);
+      background: var(--surface-strong);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .history-title {
+      margin: 0;
+      color: var(--text);
+      font-size: 1rem;
+      font-weight: 800;
+    }
+
+    .history-meta {
+      margin: 7px 0 0;
+      color: var(--text-secondary);
+      font-size: 0.86rem;
+      line-height: 1.6;
+    }
+
+    .history-courses {
+      display: flex;
+      gap: 7px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .history-course-chip {
+      padding: 6px 9px;
+      border-radius: 999px;
+      color: var(--primary);
+      background: var(--primary-soft);
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+
+    .history-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .el-divider__text {
+      background-color: var(--surface);
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+
+    /* Table styles */
+    .el-table {
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background-color: var(--surface-strong);
+    }
+    
+    .el-table th.el-table__cell {
+      background-color: var(--surface-soft);
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+    }
+
+    .el-table td.el-table__cell {
+      border-bottom: 1px solid var(--border);
+      background-color: var(--surface-strong);
+    }
+    
+    .el-table--enable-row-hover .el-table__body tr:hover > td.el-table__cell {
+      background-color: var(--surface-soft);
+    }
+    
+    .el-table::before {
+      display: none;
+    }
+
+    @media (max-width: 1120px) {
+      .hero {
+        grid-template-columns: 1fr;
+      }
+
+      .dashboard {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 820px) {
+      .page-shell {
+        width: min(100vw - 20px, 1380px);
+        padding-top: 10px;
+      }
+
+      .topbar {
+        padding: 16px;
+        border-radius: 22px;
+        position: static;
+      }
+
+      .hero-panel,
+      .hero-stats,
+      .panel {
+        border-radius: 24px;
+      }
+
+      .hero-panel {
+        padding: 24px;
+      }
+
+      .panel-header,
+      .content-toolbar,
+      .schedule-grid,
+      .schedule-sections {
+        padding-left: 18px;
+        padding-right: 18px;
+      }
+
+      .schedule-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .stats-grid,
+      .course-meta {
+        grid-template-columns: 1fr;
+      }
+
+      .history-card {
+        grid-template-columns: 1fr;
+      }
+
+      .history-actions {
+        justify-content: flex-start;
+      }
+    }
+
+    @media (max-width: 620px) {
+      .topbar,
+      .nav-links,
+      .topbar-actions,
+      .content-toolbar,
+      .course-actions,
+      .hero-toolbar {
+        align-items: stretch;
+      }
+
+      .topbar,
+      .hero-toolbar,
+      .content-toolbar,
+      .topbar-actions {
+        flex-direction: column;
+      }
+
+      .brand,
+      .nav-links,
+      .topbar-actions,
+      .content-toolbar-right {
+        width: 100%;
+      }
+
+      .nav-links {
+        justify-content: flex-start;
+      }
+
+      .nav-chip {
+        flex: 1 1 calc(50% - 10px);
+        text-align: center;
+      }
+
+      .content-toolbar-right .el-button,
+      .content-toolbar-right .el-segmented,
+      .hero-toolbar .el-button,
+      .topbar-actions .el-switch {
+        width: 100%;
+      }
+
+      .week-picker {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="page-shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark">CF</div>
+          <div class="brand-text">
+            <p class="brand-title">CampusFlow</p>
+            <p class="brand-subtitle">大学生课程表管理系统</p>
+          </div>
+        </div>
+
+        <nav class="nav-links" aria-label="主导航">
+          <button
+            v-for="item in navItems"
+            :key="item"
+            class="nav-chip"
+            :class="{ active: activeNav === item }"
+            @click="activeNav = item"
+          >
+            {{ item }}
+          </button>
+        </nav>
+
+        <div class="topbar-actions">
+          <el-switch
+            v-model="isDarkMode"
+            inline-prompt
+            active-text="暗"
+            inactive-text="亮"
+            @change="toggleTheme"
+          />
+        </div>
+      </header>
+
+      <!-- 首页视图 -->
+      <div v-show="activeNav === '首页'">
+        <section class="hero">
+          <div class="hero-panel">
+            <div class="eyebrow">课程管理 · 更清晰的大学时间感</div>
+            <h1 class="hero-title">把一周安排收进一块干净、顺手的课程板。</h1>
+          <p class="hero-desc">
+            支持左侧按“全部课程 / 周一到周日”快速筛选、课程详情弹窗、课程增删和本地持久化。界面以白色为主、蓝色点缀，保持简约和轻科技感，适合大学生日常快速查看与整理课表。
+            </p>
+            <div class="hero-toolbar">
+              <el-button type="primary" size="large" @click="goToScheduleAndAdd">
+                添加课程
+              </el-button>
+              <el-button type="success" size="large" @click="openImportDialog">
+                教务处导入
+              </el-button>
+              <el-button size="large" plain @click="activeNav = '课程表'">
+                查看我的课表
+              </el-button>
+            </div>
+          </div>
+
+          <aside class="hero-stats">
+            <div class="stats-grid">
+              <div class="stat-card">
+                <div class="stat-label">本周课程数</div>
+                <div class="stat-value">{{ currentWeekCourseCount }}</div>
+                <div class="stat-note">第 {{ currentWeek }} 周实际需要上的课程</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">当前教学周</div>
+                <div class="stat-value">第 {{ currentWeek }} 周</div>
+                <div class="stat-note">用于识别哪些课程已经结课</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">今日课程</div>
+                <div class="stat-value">{{ todayCourseCount }}</div>
+                <div class="stat-note">{{ todayLabel }} 的安排一眼可见</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">当前筛选</div>
+                <div class="stat-value">{{ selectedDay }}</div>
+                <div class="stat-note">左侧点击后，右侧只展示对应课程</div>
+              </div>
+            </div>
+
+            <div class="focus-card">
+              <div class="focus-label">当前焦点</div>
+              <div class="focus-course">{{ highlightedCourse ? highlightedCourse.name : '还没有课程' }}</div>
+              <div class="focus-meta" v-if="highlightedCourse">
+                {{ highlightedCourse.day }} · {{ highlightedCourse.time }}<br>
+                {{ highlightedCourse.location }} · {{ highlightedCourse.teacher }}
+              </div>
+              <div class="focus-meta" v-else>
+                先添加一门课程，这里会立刻更新。
+              </div>
+            </div>
+          </aside>
+        </section>
+      </div>
+
+      <!-- 课程表视图 -->
+      <div v-show="activeNav === '课程表'">
+        <main class="dashboard">
+          <section class="panel timeline-panel">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">时间轴</h2>
+                <p class="panel-subtitle">全部课程与周一到周日独立筛选，一次只看一类</p>
+              </div>
+            </div>
+
+            <div class="timeline-list">
+              <button
+                class="timeline-item"
+                :class="{ active: selectedDay === '全部课程' }"
+                @click="selectedDay = '全部课程'"
+              >
+                <span class="timeline-dot" style="background: var(--primary);"></span>
+                <div class="timeline-content">
+                  <p class="timeline-day">全部课程</p>
+                  <div class="timeline-date">全周课表概览</div>
+                  <div class="timeline-count">{{ weekFilteredCourses.length }} 门课程</div>
+                </div>
+              </button>
+              <button
+                v-for="day in weekDays"
+                :key="day.name"
+                class="timeline-item"
+                :class="{ active: selectedDay === day.name }"
+                @click="selectedDay = day.name"
+              >
+                <span class="timeline-dot"></span>
+                <div class="timeline-content">
+                  <p class="timeline-day">{{ day.name }}</p>
+                  <div class="timeline-date">{{ day.dateLabel }}</div>
+                  <div class="timeline-count">{{ getVisibleCoursesByDay(day.name).length }} 门课程</div>
+                </div>
+              </button>
+            </div>
+          </section>
+
+          <section class="panel content-panel">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">课程列表</h2>
+                <p class="panel-subtitle">
+                  {{ selectedDay === '全部课程' ? '按星期分组展示全部课程' : ('当前只显示 ' + selectedDay + ' 的课程') }}
+                </p>
+              </div>
+            </div>
+
+            <div class="content-toolbar">
+              <div class="week-picker">
+                <span class="week-picker-label">查看教学周</span>
+                <el-select v-model="selectedWeek" style="width: 150px;" @change="persistSelectedWeek">
+                  <el-option label="全部周次" :value="0"></el-option>
+                  <el-option
+                    v-for="week in weekOptions"
+                    :key="week"
+                    :label="'第 ' + week + ' 周'"
+                    :value="week"
+                  ></el-option>
+                </el-select>
+              </div>
+              <div class="content-toolbar-right">
+                <div class="timeline-count">{{ selectedWeek ? ('第 ' + selectedWeek + ' 周') : '全部周次' }} · {{ displayedCourses.length }} 门</div>
+                <el-button type="success" @click="openImportDialog">教务系统同步</el-button>
+                <el-button type="primary" @click="openAddDialog">添加课程</el-button>
+                <el-button plain @click="removeSelectedDayCourses" :disabled="selectedDay === '全部课程' || !selectedDayCourseCount">
+                  删除当日全部
+                </el-button>
+              </div>
+            </div>
+
+            <div v-if="displayedCourses.length">
+              <div class="schedule-sections">
+                <section
+                  v-for="section in displaySections"
+                  :key="section.label"
+                  class="schedule-section"
+                >
+                  <div class="section-header">
+                    <div>
+                      <h3 class="section-title">{{ section.label }}</h3>
+                      <p class="section-subtitle">{{ section.description }}</p>
+                    </div>
+                    <div class="section-count">{{ section.courses.length }} 门课程</div>
+                  </div>
+
+                  <div class="schedule-grid">
+                    <article
+                      v-for="course in section.courses"
+                      :key="course.id"
+                      class="course-card"
+                      :class="{ 'is-finished': isCourseFinished(course) }"
+                    >
+                      <div class="course-card-top">
+                        <div>
+                          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;">
+                            <div class="course-tag">{{ course.day }}</div>
+                            <div v-if="selectedWeek && !isCourseFinished(course)" class="week-status-badge">
+                              第 {{ selectedWeek }} 周上课
+                            </div>
+                          </div>
+                          <h3 class="course-name">{{ course.name }}</h3>
+                          <div class="course-teacher">{{ course.teacher }}</div>
+                        </div>
+                        <div v-if="isCourseFinished(course)" class="finished-badge">已结课</div>
+                        <el-button v-else circle plain @click="showCourseDetail(course)">
+                          详
+                        </el-button>
+                      </div>
+
+                      <div class="course-meta">
+                        <div class="course-meta-item">
+                          <div class="course-meta-label">上课时间</div>
+                          <div class="course-meta-value">{{ formatCourseTime(course.time) }}</div>
+                        </div>
+                        <div class="course-meta-item">
+                          <div class="course-meta-label">上课地点</div>
+                          <div class="course-meta-value">{{ course.location }}</div>
+                        </div>
+                      </div>
+
+                      <div class="course-actions">
+                        <div class="course-week-info">
+                          <div class="course-time-pill">上课周次：{{ course.weekRange }}</div>
+                          <div v-if="getCourseMaxWeek(course)" class="course-end-pill">
+                            第 {{ getCourseMaxWeek(course) }} 周结课
+                          </div>
+                        </div>
+                        <div>
+                          <el-button text type="primary" @click="showCourseDetail(course)">详情</el-button>
+                          <el-button text type="danger" @click="deleteCourse(course.id)">删除</el-button>
+                        </div>
+                      </div>
+                    </article>
+                  </div>
+                </section>
+              </div>
+            </div>
+
+            <div v-else class="empty-state">
+              {{ selectedWeek ? ('第 ' + selectedWeek + ' 周没有课程安排。') : '当前没有课程安排。添加一门课程，这里就会生成对应的课程列表。' }}
+            </div>
+          </section>
+        </main>
+      </div>
+
+      <!-- 同步记录视图 -->
+      <div v-show="activeNav === '同步记录'">
+        <section class="panel history-panel">
+          <div class="panel-header">
+            <div>
+              <h2 class="panel-title">课表同步记录</h2>
+              <p class="panel-subtitle">每次同步都保存完整课表快照，教务服务器关闭时仍可离线查看和恢复</p>
+            </div>
+            <el-button type="success" @click="openImportDialog">立即同步</el-button>
+          </div>
+
+          <div v-if="syncHistory.length" class="history-list">
+            <article v-for="record in syncHistory" :key="record.id" class="history-card">
+              <div>
+                <h3 class="history-title">{{ record.source }} · {{ record.semester }}</h3>
+                <p class="history-meta">
+                  {{ formatSyncTime(record.syncedAt) }} · 保存 {{ record.courseCount }} 条课程安排
+                </p>
+                <div class="history-courses">
+                  <span
+                    v-for="name in getSnapshotCourseNames(record)"
+                    :key="name"
+                    class="history-course-chip"
+                  >
+                    {{ name }}
+                  </span>
+                </div>
+              </div>
+              <div class="history-actions">
+                <el-button type="primary" plain @click="restoreSyncRecord(record)">恢复此课表</el-button>
+                <el-button type="danger" text @click="deleteSyncRecord(record.id)">删除记录</el-button>
+              </div>
+            </article>
+          </div>
+
+          <div v-else class="empty-state">
+            还没有同步记录。完成一次教务同步或源码导入后，完整课表会自动保存在这里。
+          </div>
+        </section>
+      </div>
+
+      <!-- 设置视图 -->
+      <div v-show="activeNav === '设置'">
+        <section class="panel settings-panel">
+          <h2 class="panel-title" style="margin-bottom: 28px; font-size: 1.5rem;">系统设置</h2>
+          
+          <el-form label-width="140px" label-position="left" size="large">
+            <el-divider content-position="left">外观与偏好</el-divider>
+            <el-form-item label="外观模式">
+              <el-switch
+                v-model="isDarkMode"
+                active-text="深色模式"
+                inactive-text="浅色模式"
+                @change="toggleTheme"
+              />
+            </el-form-item>
+            <el-form-item label="当前教学周">
+              <div style="width: 100%;">
+                <el-input-number
+                  v-model="currentWeek"
+                  :min="1"
+                  :max="30"
+                  controls-position="right"
+                  @change="saveSettings"
+                />
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 8px 0 0 0; line-height: 1.4;">
+                  系统会根据当前教学周和课程周次，自动用明显颜色标记“已结课”的课程。
+                </p>
+              </div>
+            </el-form-item>
+
+            <el-divider content-position="left" style="margin-top: 40px;">数据管理</el-divider>
+            <el-form-item label="恢复示例数据">
+              <div>
+                <el-button @click="seedDemoData" plain>重置为示例课程</el-button>
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 6px 0 0 0; line-height: 1.4;">
+                  重置后，你现有的课表将被覆盖并替换为默认演示数据。
+                </p>
+              </div>
+            </el-form-item>
+            <el-form-item label="清空全部数据">
+              <div>
+                <el-button type="danger" plain @click="clearAllData">清空所有课程</el-button>
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 6px 0 0 0; line-height: 1.4;">
+                  此操作不可逆，清空后数据无法自动恢复。
+                </p>
+              </div>
+            </el-form-item>
+          </el-form>
+        </section>
+      </div>
+
+    </div>
+
+    <el-dialog
+      v-model="detailDialogVisible"
+      title="课程详情"
+      width="420px"
+      destroy-on-close
+    >
+      <div v-if="activeCourse" class="detail-block">
+        <div class="detail-row">
+          <div class="detail-row-label">课程名称</div>
+          <div class="detail-row-value">{{ activeCourse.name }}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-row-label">授课信息</div>
+          <div class="detail-row-value">{{ activeCourse.teacher }} · {{ activeCourse.day }} · {{ formatCourseTime(activeCourse.time) }}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-row-label">上课地点</div>
+          <div class="detail-row-value">{{ activeCourse.location }}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-row-label">周次安排</div>
+          <div class="detail-row-value">{{ activeCourse.weekRange }}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-row-label">结课信息</div>
+          <div class="detail-row-value">
+            {{ getCourseMaxWeek(activeCourse) ? ('第 ' + getCourseMaxWeek(activeCourse) + ' 周结课') : '暂未识别结课周' }}
+            · {{ isCourseFinished(activeCourse) ? '已结课' : '未结课' }}
+          </div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-row-label">课程说明</div>
+          <div class="detail-row-value">{{ activeCourse.note || '暂无补充说明' }}</div>
+        </div>
+      </div>
+    </el-dialog>
+
+    <el-dialog
+      v-model="addDialogVisible"
+      title="添加课程"
+      width="500px"
+      destroy-on-close
+    >
+      <el-form label-position="top" :model="form">
+        <el-form-item label="课程名称">
+          <el-input v-model="form.name" placeholder="例如：数据结构" />
+        </el-form-item>
+        <el-form-item label="星期">
+          <el-select v-model="form.day" placeholder="选择上课日" style="width: 100%">
+            <el-option
+              v-for="day in weekDays"
+              :key="day.name"
+              :label="day.name"
+              :value="day.name"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="时间">
+          <el-input v-model="form.time" placeholder="例如：08:30 - 10:05" />
+        </el-form-item>
+        <el-form-item label="地点">
+          <el-input v-model="form.location" placeholder="例如：博学楼 A201" />
+        </el-form-item>
+        <el-form-item label="教师">
+          <el-input v-model="form.teacher" placeholder="例如：王老师" />
+        </el-form-item>
+        <el-form-item label="周次">
+          <el-input v-model="form.weekRange" placeholder="例如：第 1 - 16 周" />
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input
+            v-model="form.note"
+            type="textarea"
+            :rows="3"
+            placeholder="可填写作业提醒、课堂要求等"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="addDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="addCourse">保存课程</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="importDialogVisible"
+      title="武汉纺织大学外经贸学院课表同步"
+      width="480px"
+      top="5vh"
+      align-center
+      destroy-on-close
+    >
+      <el-tabs v-model="importMode" stretch>
+        <el-tab-pane label="账号同步" name="account">
+          <div style="margin-bottom: 16px; color: var(--text-secondary); font-size: 0.85rem; line-height: 1.6;">
+            使用本人教务账号登录并拉取所选学期课表。账号和密码只用于本次同步，不会保存到浏览器或服务器文件。
+          </div>
+          <el-form label-position="top" :model="syncForm">
+            <el-form-item label="学号">
+              <el-input v-model.trim="syncForm.username" autocomplete="username" placeholder="请输入教务系统学号" />
+            </el-form-item>
+            <el-form-item label="密码">
+              <el-input
+                v-model="syncForm.password"
+                type="password"
+                show-password
+                autocomplete="current-password"
+                placeholder="请输入教务系统密码"
+                @keyup.enter="handleSystemImport"
+              />
+            </el-form-item>
+            <el-form-item label="学期">
+              <el-select v-model="syncForm.semester" style="width: 100%;">
+                <el-option
+                  v-for="semester in semesterOptions"
+                  :key="semester.value"
+                  :label="semester.label"
+                  :value="semester.value"
+                />
+              </el-select>
+            </el-form-item>
+          </el-form>
+          <el-alert
+            title="连续输错密码可能触发教务系统验证码，请确认后再同步。"
+            type="warning"
+            :closable="false"
+            show-icon
+            style="margin-bottom: 18px;"
+          />
+          <div style="display: flex; gap: 12px; justify-content: flex-end;">
+            <el-button @click="importDialogVisible = false">取消</el-button>
+            <el-button type="success" :loading="importLoading" @click="handleSystemImport">登录并同步</el-button>
+          </div>
+        </el-tab-pane>
+
+        <el-tab-pane label="源码导入" name="html">
+          <div style="margin-bottom: 12px; color: var(--text-secondary); font-size: 0.85rem; line-height: 1.5;">
+            教务系统临时无法连接时，可登录官网打开学生课表，把保存的 HTML 文件或页面源码导入这里。
+          </div>
+          <el-button type="primary" plain style="width: 100%; margin-bottom: 12px;" @click="openOfficialSite">
+            前往教务系统
+          </el-button>
+          <el-input
+            v-model="importHtml"
+            type="textarea"
+            :rows="5"
+            placeholder="粘贴完整课表页面源码..."
+            style="margin-bottom: 16px;"
+          />
+          <el-upload
+            action="#"
+            :auto-upload="false"
+            :show-file-list="false"
+            accept=".html,.htm,.txt"
+            @change="handleImportFileChange"
+          >
+            <el-button plain style="width: 100%; margin-bottom: 12px;">选择本地 HTML 文件</el-button>
+          </el-upload>
+          <div v-if="importFileName" style="margin-bottom: 16px; color: var(--text-secondary); font-size: 0.85rem;">
+            已选择文件：{{ importFileName }}
+          </div>
+          <div style="display: flex; gap: 12px; justify-content: flex-end;">
+            <el-button @click="importDialogVisible = false">取消</el-button>
+            <el-button type="success" :loading="importLoading" @click="handleHtmlImport">解析并导入</el-button>
+          </div>
+        </el-tab-pane>
+      </el-tabs>
+    </el-dialog>
+  </div>
+
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+  <script src="https://unpkg.com/element-plus/dist/index.full.min.js"></script>
+  <script>
+    const { createApp } = Vue;
+
+    createApp({
+      data() {
+        return {
+          navItems: ["首页", "课程表", "同步记录", "设置"],
+          activeNav: "课程表",
+          isDarkMode: false,
+          currentWeek: 1,
+          selectedWeek: 1,
+          weekOptions: Array.from({ length: 30 }, (_, index) => index + 1),
+          selectedDay: "全部课程",
+          addDialogVisible: false,
+          importDialogVisible: false,
+          importLoading: false,
+          importMode: "account",
+          importHtml: "",
+          importFileName: "",
+          syncForm: {
+            username: "",
+            password: "",
+            semester: "2025-2026-2"
+          },
+          semesterOptions: [
+            { label: "2026-2027 学年第 1 学期", value: "2026-2027-1" },
+            { label: "2025-2026 学年第 2 学期", value: "2025-2026-2" },
+            { label: "2025-2026 学年第 1 学期", value: "2025-2026-1" },
+            { label: "2024-2025 学年第 2 学期", value: "2024-2025-2" },
+            { label: "2024-2025 学年第 1 学期", value: "2024-2025-1" }
+          ],
+          detailDialogVisible: false,
+          activeCourse: null,
+          courses: [],
+          syncHistory: [],
+          form: {
+            name: "",
+            day: "周一",
+            time: "",
+            location: "",
+            teacher: "",
+            weekRange: "第 1 - 16 周",
+            note: ""
+          },
+          defaultCourses: [
+            {
+              id: 1,
+              name: "高等数学",
+              day: "周一",
+              time: "08:30 - 10:05",
+              location: "理科楼 B201",
+              teacher: "刘老师",
+              weekRange: "第 1 - 18 周",
+              note: "本周小测，记得带草稿纸。"
+            },
+            {
+              id: 2,
+              name: "大学英语",
+              day: "周一",
+              time: "14:00 - 15:35",
+              location: "文科楼 C302",
+              teacher: "Emily Chen",
+              weekRange: "第 1 - 16 周",
+              note: "准备口语展示。"
+            },
+            {
+              id: 3,
+              name: "数据结构",
+              day: "周二",
+              time: "10:20 - 11:55",
+              location: "博学楼 A405",
+              teacher: "王老师",
+              weekRange: "第 3 - 18 周",
+              note: "实验课前提前看链表部分。"
+            },
+            {
+              id: 4,
+              name: "Web 前端开发",
+              day: "周三",
+              time: "13:30 - 15:05",
+              location: "实训中心 305",
+              teacher: "周老师",
+              weekRange: "第 1 - 16 周",
+              note: "本节课提交页面设计作业。"
+            },
+            {
+              id: 5,
+              name: "操作系统",
+              day: "周四",
+              time: "08:30 - 10:05",
+              location: "博学楼 B110",
+              teacher: "李老师",
+              weekRange: "第 1 - 18 周",
+              note: "复习进程调度章节。"
+            },
+            {
+              id: 6,
+              name: "体育",
+              day: "周五",
+              time: "16:00 - 17:35",
+              location: "西操场",
+              teacher: "赵老师",
+              weekRange: "第 1 - 16 周",
+              note: "穿运动鞋，集合点名。"
+            },
+            {
+              id: 7,
+              name: "创新创业讲座",
+              day: "周日",
+              time: "19:00 - 20:30",
+              location: "大学生活动中心",
+              teacher: "校外导师团",
+              weekRange: "第 6 周",
+              note: "可以计入第二课堂学分。"
+            }
+          ]
+        };
+      },
+      computed: {
+        weekDays() {
+          const baseDate = new Date();
+          const currentDay = baseDate.getDay();
+          const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay;
+          const monday = new Date(baseDate);
+          monday.setDate(baseDate.getDate() + mondayOffset);
+          const names = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
+          return names.map((name, index) => {
+            const date = new Date(monday);
+            date.setDate(monday.getDate() + index);
+            const month = String(date.getMonth() + 1).padStart(2, "0");
+            const day = String(date.getDate()).padStart(2, "0");
+            return {
+              name,
+              dateLabel: month + "/" + day
+            };
+          });
+        },
+        weekFilteredCourses() {
+          if (!this.selectedWeek) {
+            return this.sortedCourses(this.courses);
+          }
+          return this.sortedCourses(
+            this.courses.filter((course) => this.isCourseScheduledForWeek(course, this.selectedWeek))
+          );
+        },
+        displayedCourses() {
+          if (this.selectedDay === "全部课程") {
+            return this.weekFilteredCourses;
+          }
+          return this.sortedCourses(this.getVisibleCoursesByDay(this.selectedDay));
+        },
+        displaySections() {
+          if (this.selectedDay === "全部课程") {
+            return this.weekDays
+              .map((day) => {
+                const courses = this.sortedCourses(this.getVisibleCoursesByDay(day.name));
+                return {
+                  label: day.name,
+                  description: day.dateLabel,
+                  courses
+                };
+              })
+              .filter((section) => section.courses.length);
+          }
+
+          return [{
+            label: this.selectedDay,
+            description: "当天课程安排",
+            courses: this.displayedCourses
+          }];
+        },
+        totalCourses() {
+          return this.courses.length;
+        },
+        currentWeekCourseCount() {
+          return this.courses.filter((course) => this.isCourseScheduledForWeek(course, this.currentWeek)).length;
+        },
+        selectedDayCourseCount() {
+          if (this.selectedDay === "全部课程") {
+            return 0;
+          }
+          return this.getVisibleCoursesByDay(this.selectedDay).length;
+        },
+        todayLabel() {
+          const dayMap = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+          return dayMap[new Date().getDay()];
+        },
+        todayCourseCount() {
+          return this.courses.filter((course) => (
+            course.day === this.todayLabel && this.isCourseScheduledForWeek(course, this.currentWeek)
+          )).length;
+        },
+        highlightedCourse() {
+          return this.displayedCourses[0] || this.courses[0] || null;
+        }
+      },
+      methods: {
+        async loadCourses() {
+          const storedCourses = localStorage.getItem("campusflow-courses");
+          const localPayload = storedCourses
+            ? JSON.parse(storedCourses)
+            : this.defaultCourses;
+
+          try {
+            const response = await axios.get("https://jsonplaceholder.typicode.com/posts/1", {
+              timeout: 3000
+            });
+
+            if (response && response.status >= 200 && response.status < 300) {
+              this.courses = localPayload;
+            }
+          } catch (error) {
+            this.courses = localPayload;
+          }
+
+          this.persistCourses();
+        },
+        persistCourses() {
+          localStorage.setItem("campusflow-courses", JSON.stringify(this.courses));
+        },
+        loadSyncHistory() {
+          try {
+            const storedHistory = localStorage.getItem("campusflow-sync-history");
+            this.syncHistory = storedHistory ? JSON.parse(storedHistory) : [];
+          } catch (error) {
+            this.syncHistory = [];
+          }
+        },
+        persistSyncHistory() {
+          try {
+            localStorage.setItem("campusflow-sync-history", JSON.stringify(this.syncHistory));
+          } catch (error) {
+            ElementPlus.ElMessage.error("同步记录存储空间不足，请删除较早的记录后重试");
+          }
+        },
+        saveSyncSnapshot(source, semester, courses) {
+          const snapshot = JSON.parse(JSON.stringify(courses));
+          this.syncHistory.unshift({
+            id: Date.now(),
+            syncedAt: new Date().toISOString(),
+            source,
+            semester,
+            courseCount: snapshot.length,
+            courses: snapshot
+          });
+          this.persistSyncHistory();
+        },
+        formatSyncTime(value) {
+          const date = new Date(value);
+          if (Number.isNaN(date.getTime())) {
+            return "时间未知";
+          }
+          return date.toLocaleString("zh-CN", { hour12: false });
+        },
+        getSnapshotCourseNames(record) {
+          return [...new Set((record.courses || []).map((course) => course.name))];
+        },
+        restoreSyncRecord(record) {
+          ElementPlus.ElMessageBox.confirm(
+            `确定恢复 ${this.formatSyncTime(record.syncedAt)} 保存的课表吗？当前课表会被该快照替换。`,
+            "恢复同步记录",
+            { confirmButtonText: "确定恢复", cancelButtonText: "取消", type: "warning" }
+          ).then(() => {
+            this.courses = JSON.parse(JSON.stringify(record.courses || []));
+            this.persistCourses();
+            this.selectedWeek = this.currentWeek;
+            this.selectedDay = "全部课程";
+            this.activeNav = "课程表";
+            ElementPlus.ElMessage.success("课表已从同步记录恢复");
+          }).catch(() => {});
+        },
+        deleteSyncRecord(recordId) {
+          ElementPlus.ElMessageBox.confirm(
+            "确定删除这条同步记录吗？当前正在使用的课程表不会受到影响。",
+            "删除同步记录",
+            { confirmButtonText: "删除", cancelButtonText: "取消", type: "warning" }
+          ).then(() => {
+            this.syncHistory = this.syncHistory.filter((record) => record.id !== recordId);
+            this.persistSyncHistory();
+            ElementPlus.ElMessage.success("同步记录已删除");
+          }).catch(() => {});
+        },
+        toggleTheme() {
+          document.body.classList.toggle("dark-mode", this.isDarkMode);
+          localStorage.setItem("campusflow-theme", this.isDarkMode ? "dark" : "light");
+        },
+        initializeSettings() {
+          const storedTheme = localStorage.getItem("campusflow-theme");
+          this.isDarkMode = storedTheme === "dark";
+          document.body.classList.toggle("dark-mode", this.isDarkMode);
+
+          const storedWeek = Number(localStorage.getItem("campusflow-current-week"));
+          this.currentWeek = Number.isFinite(storedWeek) && storedWeek > 0 ? storedWeek : 1;
+
+          const storedSelectedWeek = Number(localStorage.getItem("campusflow-selected-week"));
+          this.selectedWeek = Number.isFinite(storedSelectedWeek) && storedSelectedWeek >= 0
+            ? storedSelectedWeek
+            : this.currentWeek;
+        },
+        saveSettings() {
+          localStorage.setItem("campusflow-current-week", String(this.currentWeek));
+          ElementPlus.ElMessage.success("偏好设置已保存");
+        },
+        persistSelectedWeek() {
+          localStorage.setItem("campusflow-selected-week", String(this.selectedWeek));
+        },
+        getCoursesByDay(day) {
+          return this.courses.filter((course) => course.day === day);
+        },
+        getVisibleCoursesByDay(day) {
+          return this.weekFilteredCourses.filter((course) => course.day === day);
+        },
+        sortedCourses(list) {
+          const dayOrder = { "周一": 1, "周二": 2, "周三": 3, "周四": 4, "周五": 5, "周六": 6, "周日": 7 };
+          return [...list].sort((a, b) => {
+            if (dayOrder[a.day] !== dayOrder[b.day]) {
+              return dayOrder[a.day] - dayOrder[b.day];
+            }
+            return a.time.localeCompare(b.time);
+          });
+        },
+        formatCourseTime(value) {
+          const text = String(value || "时间待定").trim();
+          const compact = text.replace(/\s+/g, "");
+          const sectionMatch = compact.match(/^第?(\d+(?:-\d+)?)节*$/);
+          if (sectionMatch) {
+            return `第 ${sectionMatch[1]} 节`;
+          }
+          return text.replace(/节\s*节/g, "节");
+        },
+        getCourseWeeks(course) {
+          const rawRange = String(course.weekRange || "")
+            .replace(/[第周\s]/g, "")
+            .replace(/[（]/g, "(")
+            .replace(/[）]/g, ")");
+          const weeks = new Set();
+
+          rawRange.split(/[,，、;；]/).forEach((segment) => {
+            const numbers = segment.match(/\d+/g);
+            if (!numbers || !numbers.length) {
+              return;
+            }
+            const start = Number(numbers[0]);
+            const end = numbers.length > 1 ? Number(numbers[1]) : start;
+            const parity = segment.includes("单") ? 1 : (segment.includes("双") ? 0 : null);
+            for (let week = start; week <= end; week += 1) {
+              if (parity === null || week % 2 === parity) {
+                weeks.add(week);
+              }
+            }
+          });
+
+          return [...weeks].sort((a, b) => a - b);
+        },
+        isCourseScheduledForWeek(course, week) {
+          if (!week) {
+            return true;
+          }
+          const weeks = this.getCourseWeeks(course);
+          return !weeks.length || weeks.includes(Number(week));
+        },
+        getCourseMaxWeek(course) {
+          const weeks = this.getCourseWeeks(course);
+          return weeks.length ? weeks[weeks.length - 1] : null;
+        },
+        isCourseFinished(course) {
+          const maxWeek = this.getCourseMaxWeek(course);
+          if (!maxWeek) {
+            return false;
+          }
+          return this.currentWeek > maxWeek;
+        },
+        showCourseDetail(course) {
+          this.activeCourse = course;
+          this.detailDialogVisible = true;
+        },
+        resetForm() {
+          this.form = {
+            name: "",
+            day: this.selectedDay === "全部课程" ? (this.todayLabel === "周日" ? "周一" : this.todayLabel) : this.selectedDay,
+            time: "",
+            location: "",
+            teacher: "",
+            weekRange: "第 1 - 16 周",
+            note: ""
+          };
+        },
+        goToScheduleAndAdd() {
+          this.activeNav = '课程表';
+          this.openAddDialog();
+        },
+        openImportDialog() {
+          this.importMode = "account";
+          this.importHtml = "";
+          this.importFileName = "";
+          this.syncForm.username = "";
+          this.syncForm.password = "";
+          this.importDialogVisible = true;
+        },
+        apiEndpoint(path) {
+          const base = window.location.protocol === "file:" ? "http://127.0.0.1:8000" : "";
+          return base + path;
+        },
+        async handleSystemImport() {
+          if (!this.syncForm.username || !this.syncForm.password) {
+            ElementPlus.ElMessage.warning("请输入教务系统学号和密码");
+            return;
+          }
+
+          this.importLoading = true;
+          try {
+            const response = await axios.post(
+              this.apiEndpoint("/api/whcibe/schedule"),
+              {
+                username: this.syncForm.username,
+                password: this.syncForm.password,
+                semester: this.syncForm.semester
+              },
+              { timeout: 35000 }
+            );
+            const newCourses = response.data && Array.isArray(response.data.data)
+              ? response.data.data
+              : [];
+
+            if (!newCourses.length) {
+              ElementPlus.ElMessage.warning(response.data.message || "该学期暂未查询到课程");
+              return;
+            }
+
+            const manualCourses = this.courses.filter((course) => course.source !== "whcibe");
+            this.courses = [...manualCourses, ...newCourses];
+            this.persistCourses();
+            this.saveSyncSnapshot("教务系统账号同步", this.syncForm.semester, this.courses);
+            this.selectedDay = "全部课程";
+            this.importDialogVisible = false;
+            ElementPlus.ElMessage.success(`已从教务系统同步 ${newCourses.length} 条课程安排`);
+          } catch (error) {
+            const detail = error.response && error.response.data && error.response.data.detail;
+            const message = typeof detail === "string"
+              ? detail
+              : "同步失败，请确认后端服务已启动，或稍后重试";
+            ElementPlus.ElMessage.error(message);
+          } finally {
+            this.syncForm.password = "";
+            this.importLoading = false;
+          }
+        },
+        openOfficialSite() {
+          window.open('https://jw.whcibe.com/xtgl/login_slogin.html', '_blank');
+        },
+        handleImportFileChange(file) {
+          const rawFile = file.raw;
+          if (!rawFile) {
+            return;
+          }
+
+          this.importFileName = rawFile.name;
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            this.importHtml = String(event.target && event.target.result ? event.target.result : "");
+          };
+          reader.readAsText(rawFile, "utf-8");
+        },
+        parseScheduleHtml(htmlText) {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(htmlText, "text/html");
+          const courses = [];
+          const dayMap = { 1: "周一", 2: "周二", 3: "周三", 4: "周四", 5: "周五", 6: "周六", 7: "周日" };
+
+          doc.querySelectorAll('td[id]').forEach((cell) => {
+            const cellMatch = cell.id.match(/^([1-7])-(\d+)$/);
+            if (!cellMatch) {
+              return;
+            }
+
+            cell.querySelectorAll(".timetable_con").forEach((block) => {
+              const nameNode = block.querySelector(".title");
+              if (!nameNode) {
+                return;
+              }
+
+              const paragraphs = Array.from(block.querySelectorAll("p"));
+              const values = paragraphs.map((item) => item.textContent.trim()).filter(Boolean);
+              const sectionWeek = values[1] || "";
+              const sectionMatch = sectionWeek.match(/^\(([^)]+节)\)\s*(.+)$/);
+              courses.push({
+                id: Date.now() + courses.length,
+                name: nameNode.textContent.trim(),
+                day: dayMap[Number(cellMatch[1])],
+                time: sectionMatch ? sectionMatch[1] : `第 ${cellMatch[2]} 节`,
+                location: values[2] || "未知地点",
+                teacher: values[3] || "未知教师",
+                weekRange: sectionMatch ? sectionMatch[2] : "未知周次",
+                note: "从教务课表页面解析导入",
+                source: "whcibe"
+              });
+            });
+          });
+
+          if (courses.length) {
+            return courses;
+          }
+
+          let table = doc.querySelector("#kbtable, .table_xk, #formatKbTable");
+          if (!table) {
+            table = Array.from(doc.querySelectorAll("table")).find((item) => {
+              const text = item.textContent || "";
+              return item.querySelector(".kbcontent") || text.includes("星期一") || text.includes("周一");
+            });
+          }
+
+          if (!table) {
+            throw new Error("未找到课表表格，请确认导入的是课表页面源码");
+          }
+
+          const rows = table.querySelectorAll("tbody tr, tr");
+          rows.forEach((row) => {
+            const cells = row.querySelectorAll("td");
+            if (!cells.length) {
+              return;
+            }
+
+            let dayIndex = 0;
+            cells.forEach((cell) => {
+              if (!cell.id && !cell.querySelector(".kbcontent")) {
+                return;
+              }
+
+              const blocks = cell.querySelectorAll(".kbcontent");
+              const targets = blocks.length ? Array.from(blocks) : [cell];
+
+              targets.forEach((target) => {
+                const text = (target.textContent || "").trim();
+                if (!text || text.length <= 2) {
+                  return;
+                }
+
+                const classBlocks = text.split("---------------------");
+                classBlocks.forEach((block) => {
+                  const parts = block
+                    .split("\n")
+                    .map((item) => item.trim())
+                    .filter(Boolean);
+
+                  if (!parts.length) {
+                    return;
+                  }
+
+                  courses.push({
+                    id: Date.now() + courses.length,
+                    name: parts[0] || "未知课程",
+                    day: dayMap[dayIndex % 7 + 1] || "未知",
+                    time: "见原表时间",
+                    location: parts[3] || "未知地点",
+                    teacher: parts[1] || "未知教师",
+                    weekRange: parts[2] || "未知周次",
+                    note: "网页源码解析导入",
+                    source: "whcibe"
+                  });
+                });
+              });
+
+              dayIndex += 1;
+            });
+          });
+
+          return courses;
+        },
+        async handleHtmlImport() {
+          if (!this.importHtml.trim()) {
+            ElementPlus.ElMessage.warning("请先粘贴网页源码");
+            return;
+          }
+          
+          this.importLoading = true;
+          try {
+            const newCourses = this.parseScheduleHtml(this.importHtml);
+            if (!newCourses.length) {
+              ElementPlus.ElMessage.warning("未能解析到课程，请确认粘贴的是完整课表页面源码。");
+              return;
+            }
+
+            const manualCourses = this.courses.filter((course) => course.source !== "whcibe");
+            this.courses = [...manualCourses, ...newCourses];
+            this.persistCourses();
+            this.saveSyncSnapshot("教务课表源码导入", "页面识别", this.courses);
+
+            ElementPlus.ElMessage.success(`成功导入 ${newCourses.length} 门课程，现在任何设备打开都能直接使用。`);
+            this.importDialogVisible = false;
+            this.importHtml = "";
+            this.importFileName = "";
+          } catch (error) {
+            const errorMsg = error.message || "解析失败，请确认导入的是正确的课表源码";
+            ElementPlus.ElMessage.error(errorMsg);
+          } finally {
+            this.importLoading = false;
+          }
+        },
+        openAddDialog() {
+          this.resetForm();
+          this.addDialogVisible = true;
+        },
+        addCourse() {
+          const requiredFields = ["name", "day", "time", "location", "teacher"];
+          const hasEmptyField = requiredFields.some((field) => !String(this.form[field]).trim());
+
+          if (hasEmptyField) {
+            ElementPlus.ElMessage.warning("请先填写完整的课程信息。");
+            return;
+          }
+
+          const course = {
+            id: Date.now(),
+            name: this.form.name.trim(),
+            day: this.form.day,
+            time: this.form.time.trim(),
+            location: this.form.location.trim(),
+            teacher: this.form.teacher.trim(),
+            weekRange: this.form.weekRange.trim() || "第 1 - 16 周",
+            note: this.form.note.trim()
+          };
+
+          this.courses.push(course);
+          this.persistCourses();
+          this.addDialogVisible = false;
+          this.selectedDay = course.day;
+          ElementPlus.ElMessage.success("课程已添加到课表。");
+        },
+        deleteCourse(courseId) {
+          this.courses = this.courses.filter((course) => course.id !== courseId);
+          this.persistCourses();
+          ElementPlus.ElMessage.success("课程已删除。");
+        },
+        removeSelectedDayCourses() {
+          if (!this.selectedDayCourseCount) {
+            return;
+          }
+
+          this.courses = this.courses.filter((course) => course.day !== this.selectedDay);
+          this.persistCourses();
+          ElementPlus.ElMessage.success(this.selectedDay + " 的课程已清空。");
+        },
+        seedDemoData() {
+          this.courses = this.defaultCourses.map((item) => ({ ...item }));
+          this.persistCourses();
+          ElementPlus.ElMessage.success("示例课程已恢复。");
+        },
+        clearAllData() {
+          ElementPlus.ElMessageBox.confirm('确定要清空所有课程数据吗？此操作不可逆。', '警告', {
+            confirmButtonText: '确定清空',
+            cancelButtonText: '取消',
+            type: 'warning'
+          }).then(() => {
+            this.courses = [];
+            this.persistCourses();
+            ElementPlus.ElMessage.success("所有课程数据已清空。");
+          }).catch(() => {});
+        }
+      },
+      mounted() {
+        this.initializeSettings();
+        this.loadSyncHistory();
+        this.loadCourses();
+        this.selectedDay = "全部课程";
+      }
+    }).use(ElementPlus).mount("#app");
+  </script>
+</body>
+</html>

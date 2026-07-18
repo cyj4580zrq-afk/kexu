@@ -1,0 +1,23 @@
+{
+  "name": "campusflow-android",
+  "version": "0.3.2",
+  "private": true,
+  "description": "课序 Android 课程表",
+  "scripts": {
+    "sync": "cap sync android",
+    "build:apk": "cd android && gradlew.bat assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.4.2",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/core": "8.4.2",
+    "axios": "^1.18.1",
+    "element-plus": "2.11.4",
+    "jsencrypt": "^3.3.2",
+    "lucide": "^0.468.0",
+    "vue": "3.5.22"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.4.2"
+  }
+}
