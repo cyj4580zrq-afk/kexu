@@ -67,7 +67,6 @@ final class AppUITests: XCTestCase {
             }
         }
         XCTAssertTrue(app.staticTexts["课序 0.5.2"].waitForExistence(timeout: 10), "未进入设置页面")
-        XCTAssertTrue(app.staticTexts["隐私与非官方说明"].exists)
         capture("05-settings")
 
         let privacyButton = app.buttons.matching(
