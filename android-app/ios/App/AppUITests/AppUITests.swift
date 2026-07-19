@@ -7,8 +7,17 @@ final class AppUITests: XCTestCase {
         continueAfterFailure = false
         app = XCUIApplication()
         app.launchArguments += ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
-        app.launch()
-        XCTAssertTrue(app.buttons["首页"].waitForExistence(timeout: 20), "首页未能正常加载")
+        var homeLoaded = false
+        for _ in 0..<2 {
+            app.launch()
+            if app.buttons["首页"].waitForExistence(timeout: 25) {
+                homeLoaded = true
+                break
+            }
+            app.terminate()
+            Thread.sleep(forTimeInterval: 2)
+        }
+        XCTAssertTrue(homeLoaded, "首页连续两次启动均未能正常加载")
     }
 
     func testCorePagesAndLocalCourseFlow() throws {

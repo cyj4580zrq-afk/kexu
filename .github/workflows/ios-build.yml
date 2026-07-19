@@ -24,6 +24,7 @@ permissions:
 jobs:
   simulator-test:
     runs-on: macos-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout source
@@ -91,6 +92,9 @@ jobs:
             -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
             -derivedDataPath DerivedData \
             -resultBundlePath TestArtifacts/AppUITests.xcresult \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 240 \
+            -maximum-test-execution-time-allowance 300 \
             CODE_SIGNING_ALLOWED=NO \
             test | tee TestArtifacts/xcodebuild.log
 
