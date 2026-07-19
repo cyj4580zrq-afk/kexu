@@ -318,6 +318,15 @@
             <em>第 {{ currentWeek }} 周</em>
             <app-icon name="ChevronRight" :size="18"></app-icon>
           </button>
+          <div class="setting-row period-setting">
+            <span class="setting-icon amber"><app-icon name="Timer" :size="19"></app-icon></span>
+            <span><strong>每小节时长</strong><small>小课间 5 分钟，长课间 20 分钟</small></span>
+            <div class="period-stepper" aria-label="调整每小节时长">
+              <button type="button" aria-label="减少五分钟" :disabled="periodDuration <= 30" @click="adjustPeriodDuration(-5)"><app-icon name="Minus" :size="15"></app-icon></button>
+              <output>{{ periodDuration }}<small>分钟</small></output>
+              <button type="button" aria-label="增加五分钟" :disabled="periodDuration >= 60" @click="adjustPeriodDuration(5)"><app-icon name="Plus" :size="15"></app-icon></button>
+            </div>
+          </div>
           <div class="setting-row">
             <span class="setting-icon green"><app-icon name="PanelTop" :size="19"></app-icon></span>
             <span><strong>首页课程范围</strong><small>决定首页显示哪些课程</small></span>
@@ -386,7 +395,7 @@
           </button>
         </div>
 
-        <p class="version-text">课序 Android 0.4.0</p>
+        <p class="version-text">课序 Android 0.4.1</p>
       </section>
     </main>
 
@@ -440,7 +449,7 @@
           <em v-if="isCourseFinished(activeCourse)">已结课</em>
         </div>
         <dl class="detail-list">
-          <div><dt><app-icon name="Clock3" :size="18"></app-icon>上课时间</dt><dd>{{ activeCourse.day }} · {{ formatCourseTime(activeCourse.time) }}</dd></div>
+          <div><dt><app-icon name="Clock3" :size="18"></app-icon>上课时间</dt><dd>{{ activeCourse.day }} · {{ formatCourseTime(activeCourse.time) }}<small>{{ formatCourseClock(activeCourse.time) }}</small></dd></div>
           <div><dt><app-icon name="MapPin" :size="18"></app-icon>上课地点</dt><dd>{{ activeCourse.location || '地点待定' }}</dd></div>
           <div><dt><app-icon name="CalendarRange" :size="18"></app-icon>上课周次</dt><dd>{{ normalizeWeekRange(activeCourse.weekRange) }}</dd></div>
         </dl>

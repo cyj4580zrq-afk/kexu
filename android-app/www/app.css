@@ -357,6 +357,11 @@ body.dark .focus-topline em { background: rgba(0,0,0,.07); }
 .setting-row strong { font-size: 14px; }
 .setting-row small { color: var(--muted); font-size: 11px; }
 .setting-row em { color: var(--muted); font-size: 12px; font-style: normal; }
+.period-stepper { display: grid; grid-template-columns: 30px 54px 30px; align-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-muted); }
+.period-stepper button { display: grid; width: 30px; height: 32px; padding: 0; place-items: center; border: 0; background: transparent; color: var(--text); }
+.period-stepper button:disabled { color: var(--muted); opacity: .35; }
+.period-stepper output { display: flex; height: 32px; align-items: baseline; justify-content: center; gap: 2px; border-right: 1px solid var(--line); border-left: 1px solid var(--line); background: var(--surface); font-size: 14px; font-weight: 800; line-height: 32px; }
+.period-stepper output small { color: var(--muted); font-size: 8px; font-weight: 650; }
 .switch { position: relative; width: 46px; height: 27px; }
 .switch input { position: absolute; opacity: 0; }
 .switch span { position: absolute; inset: 0; border-radius: 14px; background: #c9d0d9; transition: .2s; }
@@ -414,7 +419,8 @@ body.dark .focus-topline em { background: rgba(0,0,0,.07); }
 .detail-list { display: grid; margin: 0 0 20px; }
 .detail-list > div { display: grid; grid-template-columns: 112px minmax(0,1fr); min-height: 54px; align-items: center; border-bottom: 1px solid var(--line); }
 .detail-list dt { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
-.detail-list dd { margin: 0; text-align: right; font-size: 13px; font-weight: 650; }
+.detail-list dd { display: grid; gap: 3px; margin: 0; text-align: right; font-size: 13px; font-weight: 650; }
+.detail-list dd small { color: var(--blue); font-size: 10px; }
 .form-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .form-pair > div { display: grid; gap: 10px; }
 
@@ -427,4 +433,6 @@ body.dark .focus-topline em { background: rgba(0,0,0,.07); }
   .day-strip { margin-right: -12px; margin-left: -12px; padding-right: 12px; padding-left: 12px; }
   .course-meta { gap: 8px; }
   .timetable-scroll { margin-right: -12px; margin-left: -12px; padding-right: 12px; padding-left: 12px; }
+  .period-setting { grid-template-columns: 36px minmax(0,1fr); }
+  .period-setting .period-stepper { grid-column: 1 / -1; justify-self: stretch; grid-template-columns: 36px 1fr 36px; }
 }

@@ -19,19 +19,16 @@ const STORAGE = {
   bounceEnabled: "campusflow-bounce-enabled",
   hapticsEnabled: "campusflow-haptics-enabled",
   scheduleView: "campusflow-schedule-view",
+  periodDuration: "campusflow-period-duration",
   username: "campusflow-school-username",
   semester: "campusflow-school-semester"
 };
 
 const WEEK_DAYS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
-const SECTION_TIMES = [
-  [1, "08:15", "09:00"], [2, "09:05", "09:50"],
-  [3, "10:05", "10:50"], [4, "10:55", "11:40"],
-  [5, "13:30", "14:15"], [6, "14:20", "15:05"],
-  [7, "15:30", "16:15"], [8, "16:20", "16:55"],
-  [9, "17:00", "17:45"], [10, "18:30", "19:15"],
-  [11, "19:20", "20:05"], [12, "20:10", "20:55"]
-].map(([section, start, end]) => ({ section, start, end }));
+const DEFAULT_PERIOD_DURATION = 45;
+const SHORT_BREAK_MINUTES = 5;
+const LONG_BREAK_MINUTES = 20;
+const EVENING_BREAK_MINUTES = 10;
 const COURSE_PALETTES = [
   ["#eaf3ff", "#2274d9", "#8fc3ff"],
   ["#eaf8f2", "#14775a", "#7fd5b7"],
@@ -68,6 +65,39 @@ function defaultSemester() {
   const month = now.getMonth() + 1;
   if (month >= 8) return `${year}-${year + 1}-1`;
   return `${year - 1}-${year}-2`;
+}
+
+function clockToMinutes(value) {
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function minutesToClock(value) {
+  const hours = Math.floor(value / 60);
+  const minutes = value % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function buildSectionTimes(duration) {
+  const times = [];
+  const addPair = (firstSection, startMinutes) => {
+    const firstEnd = startMinutes + duration;
+    const secondStart = firstEnd + SHORT_BREAK_MINUTES;
+    const secondEnd = secondStart + duration;
+    times.push(
+      { section: firstSection, start: minutesToClock(startMinutes), end: minutesToClock(firstEnd) },
+      { section: firstSection + 1, start: minutesToClock(secondStart), end: minutesToClock(secondEnd) }
+    );
+    return secondEnd;
+  };
+
+  const morningFirstEnd = addPair(1, clockToMinutes("08:15"));
+  addPair(3, morningFirstEnd + LONG_BREAK_MINUTES);
+  const afternoonFirstEnd = addPair(5, clockToMinutes("13:30"));
+  addPair(7, afternoonFirstEnd + LONG_BREAK_MINUTES);
+  const eveningFirstEnd = addPair(9, clockToMinutes("17:45"));
+  addPair(11, Math.max(clockToMinutes("19:30"), eveningFirstEnd + EVENING_BREAK_MINUTES));
+  return times;
 }
 
 function readJson(key, fallback) {
@@ -179,7 +209,7 @@ createApp({
       bounceEnabled: localStorage.getItem(STORAGE.bounceEnabled) !== "false",
       hapticsEnabled: localStorage.getItem(STORAGE.hapticsEnabled) !== "false",
       scheduleView: localStorage.getItem(STORAGE.scheduleView) || "grid",
-      sectionTimes: SECTION_TIMES,
+      periodDuration: Math.min(60, Math.max(30, Number(localStorage.getItem(STORAGE.periodDuration)) || DEFAULT_PERIOD_DURATION)),
       pullStartY: null,
       pullOffset: 0,
       exitConfirmVisible: false,
@@ -308,6 +338,9 @@ createApp({
     gridMonth() {
       return this.weekCalendarDays[0] ? this.weekCalendarDays[0].month : new Date().getMonth() + 1;
     },
+    sectionTimes() {
+      return buildSectionTimes(this.periodDuration);
+    },
     semesterOptions() {
       const currentYear = new Date().getFullYear();
       const options = [];
@@ -344,6 +377,7 @@ createApp({
     bounceEnabled(value) { localStorage.setItem(STORAGE.bounceEnabled, String(value)); },
     hapticsEnabled(value) { localStorage.setItem(STORAGE.hapticsEnabled, String(value)); },
     scheduleView(value) { localStorage.setItem(STORAGE.scheduleView, value); },
+    periodDuration(value) { localStorage.setItem(STORAGE.periodDuration, String(value)); },
     selectedWeek(value) {
       localStorage.setItem(STORAGE.selectedWeek, String(value));
     }
@@ -697,15 +731,16 @@ createApp({
     courseMinuteRange(value) {
       const sections = String(value || "").match(/\d+/g);
       if (!sections || !sections.length) return null;
-      const times = {
-        1: [480, 525], 2: [535, 580], 3: [600, 645], 4: [655, 700],
-        5: [840, 885], 6: [895, 940], 7: [950, 995], 8: [1005, 1050],
-        9: [1110, 1155], 10: [1165, 1210], 11: [1220, 1265], 12: [1275, 1320]
-      };
       const first = Number(sections[0]);
       const last = Number(sections[sections.length - 1]);
-      if (!times[first] || !times[last]) return null;
-      return { start: times[first][0], end: times[last][1] };
+      const firstTime = this.sectionTimes.find(item => item.section === first);
+      const lastTime = this.sectionTimes.find(item => item.section === last);
+      if (!firstTime || !lastTime) return null;
+      return { start: clockToMinutes(firstTime.start), end: clockToMinutes(lastTime.end) };
+    },
+    formatCourseClock(value) {
+      const range = this.courseMinuteRange(value);
+      return range ? `${minutesToClock(range.start)}-${minutesToClock(range.end)}` : "时间待定";
     },
     shortCourseTime(value) {
       const sections = String(value || "").match(/\d+/g);
@@ -824,7 +859,12 @@ createApp({
       this.compactCards = false;
       this.bounceEnabled = true;
       this.hapticsEnabled = true;
+      this.periodDuration = DEFAULT_PERIOD_DURATION;
       this.notify("已恢复默认设置");
+    },
+    adjustPeriodDuration(step) {
+      this.periodDuration = Math.min(60, Math.max(30, this.periodDuration + step));
+      this.tapFeedback();
     },
     formatDate(value) {
       const date = new Date(value);
