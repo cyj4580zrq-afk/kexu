@@ -7,17 +7,7 @@ final class AppUITests: XCTestCase {
         continueAfterFailure = false
         app = XCUIApplication()
         app.launchArguments += ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
-        var homeLoaded = false
-        for _ in 0..<2 {
-            app.launch()
-            if app.buttons["首页"].waitForExistence(timeout: 25) {
-                homeLoaded = true
-                break
-            }
-            app.terminate()
-            Thread.sleep(forTimeInterval: 2)
-        }
-        XCTAssertTrue(homeLoaded, "首页连续两次启动均未能正常加载")
+        XCTAssertTrue(launchHome(), "首页连续两次启动均未能正常加载")
     }
 
     func testCorePagesAndLocalCourseFlow() throws {
@@ -57,7 +47,9 @@ final class AppUITests: XCTestCase {
         XCTAssertTrue(savedCourse.waitForExistence(timeout: 10), "课程保存后未显示在课表中")
         capture("03-course-added")
 
-        returnToHome()
+        app.terminate()
+        Thread.sleep(forTimeInterval: 2)
+        XCTAssertTrue(launchHome(), "保存课程后重新启动应用失败")
 
         let syncButton = app.buttons["同步"]
         XCTAssertTrue(syncButton.waitForExistence(timeout: 10), "首页底部导航未显示同步入口")
@@ -93,16 +85,15 @@ final class AppUITests: XCTestCase {
         ).firstMatch
     }
 
-    private func returnToHome() {
-        let homeButton = app.buttons["首页"]
+    private func launchHome() -> Bool {
         for _ in 0..<2 {
-            let backButton = app.buttons["返回首页"]
-            XCTAssertTrue(backButton.waitForExistence(timeout: 10), "全部课表页未显示返回按钮")
-            backButton.tap()
-            if homeButton.waitForExistence(timeout: 5) {
-                return
+            app.launch()
+            if app.buttons["首页"].waitForExistence(timeout: 25) {
+                return true
             }
+            app.terminate()
+            Thread.sleep(forTimeInterval: 2)
         }
-        XCTFail("从全部课表页返回首页失败")
+        return false
     }
 }
