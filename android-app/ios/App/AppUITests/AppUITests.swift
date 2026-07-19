@@ -23,15 +23,19 @@ final class AppUITests: XCTestCase {
         app.buttons["添加课程"].tap()
         XCTAssertTrue(app.staticTexts["添加课程"].waitForExistence(timeout: 5))
 
-        let fields = app.textFields
-        XCTAssertGreaterThanOrEqual(fields.count, 4, "添加课程表单字段不完整")
-        fields.element(boundBy: 0).tap()
-        fields.element(boundBy: 0).typeText("模拟测试课程")
-        fields.element(boundBy: 2).tap()
-        fields.element(boundBy: 2).typeText("测试教室 A101")
+        XCTAssertGreaterThanOrEqual(app.textFields.count, 4, "添加课程表单字段不完整")
+        let nameField = textField(placeholder: "例如：高等数学")
+        let locationField = textField(placeholder: "例如：教学楼 A205")
+        XCTAssertTrue(nameField.exists)
+        XCTAssertTrue(locationField.exists)
+        nameField.tap()
+        nameField.typeText("UI Test Course")
+        locationField.tap()
+        locationField.typeText("A101")
+        app.staticTexts["添加课程"].tap()
         app.buttons["保存课程"].tap()
 
-        XCTAssertTrue(app.staticTexts["模拟测试课程"].waitForExistence(timeout: 5), "课程保存后未显示在课表中")
+        XCTAssertTrue(app.staticTexts["UI Test Course"].waitForExistence(timeout: 5), "课程保存后未显示在课表中")
         capture("03-course-added")
 
         app.buttons["返回首页"].tap()
@@ -57,5 +61,11 @@ final class AppUITests: XCTestCase {
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+
+    private func textField(placeholder: String) -> XCUIElement {
+        app.textFields.matching(
+            NSPredicate(format: "placeholderValue == %@", placeholder)
+        ).firstMatch
     }
 }
