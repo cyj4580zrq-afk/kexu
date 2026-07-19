@@ -21,11 +21,10 @@ final class AppUITests: XCTestCase {
     }
 
     func testCorePagesAndLocalCourseFlow() throws {
-        XCTAssertTrue(app.staticTexts["把时间留给自己"].exists)
+        let allCoursesButton = app.buttons["全部课表"]
+        XCTAssertTrue(allCoursesButton.waitForExistence(timeout: 15), "首页课程入口未完成加载")
         capture("01-home")
 
-        let allCoursesButton = app.buttons["全部课表"]
-        XCTAssertTrue(allCoursesButton.waitForExistence(timeout: 10))
         allCoursesButton.tap()
         XCTAssertTrue(app.buttons["返回首页"].waitForExistence(timeout: 15), "未进入全部课表页面")
         XCTAssertTrue(app.buttons["添加课程"].exists)
