@@ -1,16 +1,20 @@
 {
-  "name": "campusflow-android",
-  "version": "0.4.1",
+  "name": "kexu-mobile",
+  "version": "0.5.0",
   "private": true,
-  "description": "课序 Android 课程表",
+  "description": "课序 Android 与 iOS 课程表",
   "scripts": {
-    "sync": "cap sync android",
-    "build:apk": "cd android && gradlew.bat assembleDebug"
+    "sync": "cap sync && node scripts/fix-ios-package-paths.mjs",
+    "sync:android": "cap sync android",
+    "sync:ios": "cap sync ios && node scripts/fix-ios-package-paths.mjs",
+    "build:apk": "cd android && gradlew.bat assembleDebug",
+    "open:ios": "cap open ios"
   },
   "dependencies": {
     "@capacitor/android": "8.4.2",
     "@capacitor/app": "^8.1.1",
     "@capacitor/core": "8.4.2",
+    "@capacitor/ios": "^8.4.2",
     "axios": "^1.18.1",
     "element-plus": "2.11.4",
     "jsencrypt": "^3.3.2",

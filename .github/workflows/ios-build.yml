@@ -1,0 +1,58 @@
+name: iOS Build
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "android-app/ios/**"
+      - "android-app/www/**"
+      - "android-app/package.json"
+      - "android-app/package-lock.json"
+      - ".github/workflows/ios-build.yml"
+  pull_request:
+    paths:
+      - "android-app/ios/**"
+      - "android-app/www/**"
+      - "android-app/package.json"
+      - "android-app/package-lock.json"
+      - ".github/workflows/ios-build.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: android-app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: android-app
+        run: npm ci
+
+      - name: Sync iOS project
+        working-directory: android-app
+        run: npm run sync:ios
+
+      - name: Build iOS simulator app
+        working-directory: android-app/ios
+        run: |
+          xcodebuild \
+            -project App/App.xcodeproj \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "generic/platform=iOS Simulator" \
+            -derivedDataPath DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            build

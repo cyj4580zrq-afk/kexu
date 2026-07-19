@@ -28,6 +28,16 @@ android-app/android/capacitor-cordova-android-plugins/
 *.jks
 *.keystore
 
+# iOS and Xcode build output
+.DS_Store
+android-app/ios/App/Pods/
+android-app/ios/App/App/public/
+android-app/ios/DerivedData/
+android-app/ios/**/*.xcuserstate
+android-app/ios/**/xcuserdata/
+*.ipa
+*.xcarchive
+
 # IDE files
 .idea/
 .vscode/
