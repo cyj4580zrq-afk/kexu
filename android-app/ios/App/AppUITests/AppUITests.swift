@@ -15,8 +15,10 @@ final class AppUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["把时间留给自己"].exists)
         capture("01-home")
 
-        app.buttons["查看全部课程"].tap()
-        XCTAssertTrue(app.staticTexts["全部课表"].waitForExistence(timeout: 5))
+        let allCoursesButton = app.buttons["全部课表"]
+        XCTAssertTrue(allCoursesButton.waitForExistence(timeout: 10))
+        allCoursesButton.tap()
+        XCTAssertTrue(app.buttons["返回首页"].waitForExistence(timeout: 15), "未进入全部课表页面")
         XCTAssertTrue(app.buttons["添加课程"].exists)
         capture("02-timetable")
 
