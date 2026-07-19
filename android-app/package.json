@@ -1,6 +1,6 @@
 {
   "name": "campusflow-android",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "private": true,
   "description": "课序 Android 课程表",
   "scripts": {

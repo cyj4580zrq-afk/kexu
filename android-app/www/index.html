@@ -83,7 +83,12 @@
             <app-icon name="ChevronLeft" :size="22"></app-icon>
           </button>
           <div class="secondary-title"><h1>全部课表</h1><p>第 {{ selectedWeek }} 周</p></div>
-          <button class="icon-button" type="button" aria-label="添加课程" @click="openAddCourse"><app-icon name="Plus" :size="21"></app-icon></button>
+          <div class="header-actions">
+            <button class="icon-button" type="button" :aria-label="scheduleView === 'grid' ? '切换到列表视图' : '切换到网格视图'" @click="toggleScheduleView">
+              <app-icon :name="scheduleView === 'grid' ? 'Rows3' : 'LayoutGrid'" :size="20"></app-icon>
+            </button>
+            <button class="icon-button" type="button" aria-label="添加课程" @click="openAddCourse"><app-icon name="Plus" :size="21"></app-icon></button>
+          </div>
         </header>
 
         <div class="week-control">
@@ -100,6 +105,7 @@
           </button>
         </div>
 
+        <template v-if="scheduleView === 'list'">
         <nav class="day-strip" aria-label="按星期筛选">
           <button
             v-for="day in visibleDayOptions"
@@ -156,6 +162,51 @@
           <h2>这一天没有课程</h2>
           <p>切换星期或教学周查看其他安排</p>
         </div>
+        </template>
+
+        <template v-else>
+          <div class="grid-view-summary">
+            <div><strong>周课表</strong><span>{{ coursesForSelectedWeek.length }} 门课程</span></div>
+            <span>点击课程查看详情</span>
+          </div>
+          <div class="timetable-scroll">
+            <div class="timetable-grid">
+              <div class="timetable-corner"><strong>{{ gridMonth }}月</strong><span>节次</span></div>
+              <div
+                v-for="(day, index) in weekCalendarDays"
+                :key="day.name"
+                :class="['timetable-day-head', { today: day.isToday }]"
+                :style="{ gridColumn: index + 2, gridRow: 1 }"
+              >
+                <strong>{{ day.short }}</strong><span>{{ day.date }}</span>
+              </div>
+              <template v-for="section in sectionTimes" :key="section.section">
+                <div class="timetable-time" :style="{ gridColumn: 1, gridRow: section.section + 1 }">
+                  <strong>{{ section.section }}</strong><span>{{ section.start }}</span><span>{{ section.end }}</span>
+                </div>
+                <span
+                  v-for="dayIndex in 7"
+                  :key="section.section + '-' + dayIndex"
+                  class="timetable-cell"
+                  :style="{ gridColumn: dayIndex + 1, gridRow: section.section + 1 }"
+                ></span>
+              </template>
+              <button
+                v-for="course in coursesForSelectedWeek"
+                :key="'grid-' + course.id"
+                type="button"
+                :class="['timetable-course', { finished: isCourseFinished(course) }]"
+                :style="courseGridStyle(course)"
+                @click="openCourse(course)"
+              >
+                <em v-if="isCourseFinished(course)">结</em>
+                <strong>{{ course.name }}</strong>
+                <span>{{ shortLocation(course.location) }}</span>
+              </button>
+            </div>
+          </div>
+          <div v-if="!coursesForSelectedWeek.length" class="grid-empty">第 {{ selectedWeek }} 周没有课程安排</div>
+        </template>
 
       </section>
 
@@ -198,14 +249,12 @@
             </button>
           </div>
 
-          <label class="field-label" for="semester">学期</label>
-          <div class="input-shell select-shell">
+          <label class="field-label">学期</label>
+          <button type="button" class="input-shell semester-trigger" @click="semesterSheetVisible = true">
             <app-icon name="CalendarRange" :size="19"></app-icon>
-            <select id="semester" v-model="syncForm.semester">
-              <option v-for="semester in semesterOptions" :key="semester.value" :value="semester.value">{{ semester.label }}</option>
-            </select>
+            <span>{{ selectedSemesterLabel }}</span>
             <app-icon name="ChevronDown" :size="17"></app-icon>
-          </div>
+          </button>
 
           <button class="primary-button" type="submit" :disabled="syncLoading">
             <app-icon :name="syncLoading ? 'LoaderCircle' : 'RefreshCw'" :size="20" :class="{ spinning: syncLoading }"></app-icon>
@@ -337,7 +386,7 @@
           </button>
         </div>
 
-        <p class="version-text">课序 Android 0.3.2</p>
+        <p class="version-text">课序 Android 0.4.0</p>
       </section>
     </main>
 
@@ -354,6 +403,29 @@
         <header><h2>{{ weekSheetMode === 'current' ? '设置当前教学周' : '选择查看周次' }}</h2><button type="button" aria-label="关闭" @click="weekSheetVisible = false"><app-icon name="X" :size="21"></app-icon></button></header>
         <div class="week-grid">
           <button v-for="week in 30" :key="week" type="button" :class="{ active: (weekSheetMode === 'current' ? currentWeek : selectedWeek) === week }" @click="selectWeek(week)">第 {{ week }} 周</button>
+        </div>
+      </section>
+    </div>
+
+    <div v-if="semesterSheetVisible" class="sheet-overlay" @click.self="semesterSheetVisible = false">
+      <section class="bottom-sheet semester-sheet" role="dialog" aria-modal="true" aria-labelledby="semester-title">
+        <div class="sheet-handle"></div>
+        <header>
+          <div><h2 id="semester-title">选择学期</h2><p>同步对应学年的教务课表</p></div>
+          <button type="button" aria-label="关闭" @click="semesterSheetVisible = false"><app-icon name="X" :size="21"></app-icon></button>
+        </header>
+        <div class="semester-list">
+          <button
+            v-for="semester in semesterOptions"
+            :key="semester.value"
+            type="button"
+            :class="['semester-option', { active: syncForm.semester === semester.value }]"
+            @click="selectSemester(semester.value)"
+          >
+            <span class="semester-number">{{ semester.value.endsWith('-1') ? '1' : '2' }}</span>
+            <span class="semester-copy"><strong>{{ semester.label.split(' 学年')[0] }}</strong><small>{{ semester.value.endsWith('-1') ? '第一学期' : '第二学期' }}</small></span>
+            <span class="semester-check"><app-icon v-if="syncForm.semester === semester.value" name="Check" :size="16"></app-icon></span>
+          </button>
         </div>
       </section>
     </div>

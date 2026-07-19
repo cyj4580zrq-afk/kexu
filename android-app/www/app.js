@@ -18,11 +18,28 @@ const STORAGE = {
   compactCards: "campusflow-compact-cards",
   bounceEnabled: "campusflow-bounce-enabled",
   hapticsEnabled: "campusflow-haptics-enabled",
+  scheduleView: "campusflow-schedule-view",
   username: "campusflow-school-username",
   semester: "campusflow-school-semester"
 };
 
 const WEEK_DAYS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
+const SECTION_TIMES = [
+  [1, "08:15", "09:00"], [2, "09:05", "09:50"],
+  [3, "10:05", "10:50"], [4, "10:55", "11:40"],
+  [5, "13:30", "14:15"], [6, "14:20", "15:05"],
+  [7, "15:30", "16:15"], [8, "16:20", "16:55"],
+  [9, "17:00", "17:45"], [10, "18:30", "19:15"],
+  [11, "19:20", "20:05"], [12, "20:10", "20:55"]
+].map(([section, start, end]) => ({ section, start, end }));
+const COURSE_PALETTES = [
+  ["#eaf3ff", "#2274d9", "#8fc3ff"],
+  ["#eaf8f2", "#14775a", "#7fd5b7"],
+  ["#fff2e8", "#b75c20", "#ffc18f"],
+  ["#f1edff", "#6848bd", "#bca9ff"],
+  ["#e9f7fa", "#19758a", "#85d2df"],
+  ["#fff0f3", "#b84665", "#f3a4b8"]
+];
 
 const AppIcon = {
   props: {
@@ -147,6 +164,7 @@ createApp({
       selectedWeek: Number(localStorage.getItem(STORAGE.selectedWeek)) || Number(localStorage.getItem(STORAGE.currentWeek)) || 1,
       weekSheetVisible: false,
       weekSheetMode: "view",
+      semesterSheetVisible: false,
       detailVisible: false,
       addVisible: false,
       activeCourse: null,
@@ -160,6 +178,8 @@ createApp({
       compactCards: localStorage.getItem(STORAGE.compactCards) === "true",
       bounceEnabled: localStorage.getItem(STORAGE.bounceEnabled) !== "false",
       hapticsEnabled: localStorage.getItem(STORAGE.hapticsEnabled) !== "false",
+      scheduleView: localStorage.getItem(STORAGE.scheduleView) || "grid",
+      sectionTimes: SECTION_TIMES,
       pullStartY: null,
       pullOffset: 0,
       exitConfirmVisible: false,
@@ -268,6 +288,26 @@ createApp({
         courses: this.visibleCourses.filter(course => course.day === day)
       })).filter(group => group.courses.length);
     },
+    weekCalendarDays() {
+      const today = new Date();
+      const weekday = today.getDay() || 7;
+      const monday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - weekday + 1);
+      monday.setDate(monday.getDate() + (this.selectedWeek - this.currentWeek) * 7);
+      return WEEK_DAYS.map((name, index) => {
+        const date = new Date(monday);
+        date.setDate(monday.getDate() + index);
+        return {
+          name,
+          short: name.replace("周", ""),
+          date: date.getDate(),
+          month: date.getMonth() + 1,
+          isToday: date.toDateString() === today.toDateString()
+        };
+      });
+    },
+    gridMonth() {
+      return this.weekCalendarDays[0] ? this.weekCalendarDays[0].month : new Date().getMonth() + 1;
+    },
     semesterOptions() {
       const currentYear = new Date().getFullYear();
       const options = [];
@@ -276,6 +316,10 @@ createApp({
         options.push({ value: `${start}-${start + 1}-2`, label: `${start}-${start + 1} 学年 第二学期` });
       }
       return options;
+    },
+    selectedSemesterLabel() {
+      const selected = this.semesterOptions.find(option => option.value === this.syncForm.semester);
+      return selected ? selected.label : "请选择学期";
     },
     lastSyncText() {
       if (!this.syncHistory.length) return "尚未同步过课表";
@@ -299,6 +343,7 @@ createApp({
     },
     bounceEnabled(value) { localStorage.setItem(STORAGE.bounceEnabled, String(value)); },
     hapticsEnabled(value) { localStorage.setItem(STORAGE.hapticsEnabled, String(value)); },
+    scheduleView(value) { localStorage.setItem(STORAGE.scheduleView, value); },
     selectedWeek(value) {
       localStorage.setItem(STORAGE.selectedWeek, String(value));
     }
@@ -336,6 +381,10 @@ createApp({
       }
       if (this.addVisible) {
         this.addVisible = false;
+        return;
+      }
+      if (this.semesterSheetVisible) {
+        this.semesterSheetVisible = false;
         return;
       }
       if (this.weekSheetVisible) {
@@ -661,6 +710,36 @@ createApp({
     shortCourseTime(value) {
       const sections = String(value || "").match(/\d+/g);
       return sections && sections.length ? `${sections[0]}-${sections[sections.length - 1]}节` : "待定";
+    },
+    toggleScheduleView() {
+      this.scheduleView = this.scheduleView === "grid" ? "list" : "grid";
+      this.tapFeedback();
+    },
+    courseGridStyle(course) {
+      const dayIndex = WEEK_DAYS.indexOf(course.day);
+      const sections = String(course.time || "").match(/\d+/g);
+      if (dayIndex < 0 || !sections || !sections.length) return { display: "none" };
+      const first = Math.min(12, Math.max(1, Number(sections[0])));
+      const last = Math.min(12, Math.max(first, Number(sections[sections.length - 1])));
+      const seed = [...String(course.name || course.id)].reduce((sum, character) => sum + character.charCodeAt(0), 0);
+      const palette = COURSE_PALETTES[seed % COURSE_PALETTES.length];
+      return {
+        gridColumn: dayIndex + 2,
+        gridRow: `${first + 1} / ${last + 2}`,
+        "--course-bg": palette[0],
+        "--course-text": palette[1],
+        "--course-border": palette[2]
+      };
+    },
+    shortLocation(value) {
+      const text = String(value || "地点待定").trim();
+      return text.length > 12 ? `${text.slice(0, 12)}…` : text;
+    },
+    selectSemester(value) {
+      this.syncForm.semester = value;
+      localStorage.setItem(STORAGE.semester, value);
+      this.semesterSheetVisible = false;
+      this.tapFeedback();
     },
     getDayCount(day) {
       return this.coursesForSelectedWeek.filter(course => course.day === day).length;

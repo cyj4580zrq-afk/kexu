@@ -107,7 +107,9 @@ body.dark .focus-topline em { background: rgba(0,0,0,.07); }
 .all-schedule-button span { display: flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 750; }
 
 .secondary-page { padding-bottom: calc(30px + var(--safe-bottom)); }
-.secondary-page .topbar { display: grid; grid-template-columns: 44px minmax(0,1fr) 44px; }
+.secondary-page .topbar { display: grid; grid-template-columns: 44px minmax(0,1fr) 94px; }
+.header-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.header-actions .icon-button { width: 42px; height: 42px; box-shadow: none; }
 .back-button { display: grid; width: 44px; height: 44px; padding: 0; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: var(--surface); }
 .secondary-title { min-width: 0; text-align: center; }
 .secondary-title h1 { font-size: 19px; }
@@ -238,6 +240,33 @@ body.dark .focus-topline em { background: rgba(0,0,0,.07); }
 .finished .course-weeks { color: var(--red); }
 .row-chevron { align-self: center; color: var(--muted); }
 
+.grid-view-summary { display: flex; align-items: center; justify-content: space-between; margin: 2px 2px 10px; }
+.grid-view-summary div { display: flex; align-items: baseline; gap: 8px; }
+.grid-view-summary strong { font-size: 16px; }
+.grid-view-summary span { color: var(--muted); font-size: 11px; }
+.timetable-scroll { margin: 0 -16px; padding: 0 16px 8px; overflow-x: auto; scrollbar-width: none; }
+.timetable-scroll::-webkit-scrollbar { display: none; }
+.timetable-grid { position: relative; display: grid; grid-template-columns: 38px repeat(7, minmax(40px, 1fr)); grid-template-rows: 52px repeat(12, 68px); min-width: 328px; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.timetable-corner, .timetable-day-head, .timetable-time { z-index: 2; display: flex; align-items: center; justify-content: center; background: var(--surface); }
+.timetable-corner { grid-column: 1; grid-row: 1; flex-direction: column; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.timetable-corner strong { font-size: 12px; }
+.timetable-corner span { margin-top: 2px; color: var(--muted); font-size: 9px; }
+.timetable-day-head { flex-direction: column; gap: 4px; border-bottom: 1px solid var(--line); }
+.timetable-day-head strong { color: var(--muted); font-size: 11px; }
+.timetable-day-head span { display: grid; width: 23px; height: 23px; place-items: center; border-radius: 5px; font-size: 11px; font-weight: 700; }
+.timetable-day-head.today strong { color: var(--blue); }
+.timetable-day-head.today span { background: var(--blue); color: #fff; }
+.timetable-time { flex-direction: column; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.timetable-time strong { font-size: 12px; }
+.timetable-time span { margin-top: 2px; color: var(--muted); font-size: 7px; line-height: 1; }
+.timetable-cell { border-right: 1px solid color-mix(in srgb, var(--line) 65%, transparent); border-bottom: 1px solid var(--line); }
+.timetable-course { position: relative; z-index: 4; display: flex; min-width: 0; margin: 2px; padding: 5px 3px; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 3px; overflow: hidden; text-align: center; border: 1px solid var(--course-border); border-top-width: 4px; border-radius: 6px; background: var(--course-bg); color: var(--course-text); }
+.timetable-course strong { display: -webkit-box; overflow: hidden; font-size: 10px; line-height: 1.32; word-break: break-all; -webkit-box-orient: vertical; -webkit-line-clamp: 5; }
+.timetable-course span { display: -webkit-box; overflow: hidden; margin-top: auto; opacity: .82; font-size: 8px; line-height: 1.25; word-break: break-all; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.timetable-course em { position: absolute; align-self: flex-end; padding: 1px 3px; border-radius: 3px; background: var(--red); color: #fff; font-size: 8px; font-style: normal; }
+.timetable-course.finished { border-color: #ec9b9b; background: var(--red-soft); color: var(--red); }
+.grid-empty { margin-top: 16px; text-align: center; color: var(--muted); font-size: 12px; }
+
 .empty-state { display: flex; min-height: 300px; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
 .empty-icon { display: grid; width: 58px; height: 58px; place-items: center; border-radius: 50%; background: var(--surface-muted); color: var(--muted); }
 .empty-state h2 { margin: 15px 0 5px; font-size: 17px; }
@@ -280,6 +309,8 @@ body.dark .focus-topline em { background: rgba(0,0,0,.07); }
 .input-shell input, .input-shell select { min-width: 0; height: 100%; flex: 1; border: 0; outline: 0; background: transparent; color: var(--text); font-size: 15px; }
 .input-shell input::placeholder, textarea::placeholder { color: color-mix(in srgb, var(--muted) 70%, transparent); }
 .input-shell select { appearance: none; }
+.semester-trigger { width: 100%; justify-content: flex-start; text-align: left; }
+.semester-trigger > span:nth-child(2) { min-width: 0; flex: 1; overflow: hidden; color: var(--text); font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
 .input-icon { display: grid; padding: 5px; place-items: center; border: 0; background: transparent; color: var(--muted); }
 
 .primary-button, .secondary-button, .danger-button { display: flex; min-height: 50px; align-items: center; justify-content: center; gap: 8px; border-radius: 8px; font-weight: 750; }
@@ -356,10 +387,23 @@ body.dark .focus-topline em { background: rgba(0,0,0,.07); }
 .sheet-handle { width: 38px; height: 4px; margin: 8px auto 13px; border-radius: 2px; background: var(--line); }
 .bottom-sheet header { display: flex; min-height: 44px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .bottom-sheet header h2 { margin: 0; font-size: 19px; }
+.bottom-sheet header p { margin: 4px 0 0; color: var(--muted); font-size: 11px; }
 .bottom-sheet header button { display: grid; width: 36px; height: 36px; padding: 0; place-items: center; border: 0; border-radius: 50%; background: var(--surface-muted); }
 .week-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
 .week-grid button { height: 42px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); font-size: 13px; }
 .week-grid button.active { border-color: var(--blue); background: var(--blue); color: #fff; font-weight: 700; }
+.semester-sheet { max-height: calc(84vh - var(--safe-top)); }
+.semester-sheet header { align-items: flex-start; }
+.semester-list { display: grid; gap: 7px; }
+.semester-option { display: grid; grid-template-columns: 38px minmax(0,1fr) 24px; min-height: 62px; align-items: center; gap: 11px; padding: 8px 12px; text-align: left; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.semester-option.active { border-color: var(--blue); background: var(--blue-soft); }
+.semester-number { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 7px; background: var(--surface-muted); color: var(--muted); font-size: 14px; font-weight: 800; }
+.semester-option.active .semester-number { background: var(--blue); color: #fff; }
+.semester-copy { display: grid; gap: 4px; }
+.semester-copy strong { font-size: 14px; }
+.semester-copy small { color: var(--muted); font-size: 11px; }
+.semester-check { display: grid; width: 22px; height: 22px; place-items: center; border: 1.5px solid var(--line); border-radius: 50%; color: #fff; }
+.semester-option.active .semester-check { border-color: var(--blue); background: var(--blue); }
 
 .detail-title { display: grid; grid-template-columns: 5px minmax(0,1fr) auto; gap: 12px; align-items: center; margin-bottom: 18px; padding: 14px; border: 1px solid var(--line); border-radius: 8px; }
 .detail-title > span { width: 5px; height: 44px; border-radius: 3px; background: var(--blue); }
@@ -382,4 +426,5 @@ body.dark .focus-topline em { background: rgba(0,0,0,.07); }
   .page { padding-right: 12px; padding-left: 12px; }
   .day-strip { margin-right: -12px; margin-left: -12px; padding-right: 12px; padding-left: 12px; }
   .course-meta { gap: 8px; }
+  .timetable-scroll { margin-right: -12px; margin-left: -12px; padding-right: 12px; padding-left: 12px; }
 }
