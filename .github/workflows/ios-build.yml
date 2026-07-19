@@ -22,7 +22,7 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  simulator-test:
     runs-on: macos-latest
 
     steps:
@@ -44,15 +44,81 @@ jobs:
         working-directory: android-app
         run: npm run sync:ios
 
-      - name: Build iOS simulator app
-        working-directory: android-app/ios
+      - name: Select iPhone simulator
+        shell: bash
         run: |
+          python3 - <<'PY' >> "$GITHUB_ENV"
+          import json
+          import subprocess
+
+          payload = json.loads(subprocess.check_output(
+              ["xcrun", "simctl", "list", "devices", "available", "-j"],
+              text=True,
+          ))
+          for runtime in sorted(payload["devices"], reverse=True):
+              iphones = [
+                  device for device in payload["devices"][runtime]
+                  if device.get("isAvailable") and device["name"].startswith("iPhone")
+              ]
+              if iphones:
+                  device = iphones[0]
+                  print(f"SIMULATOR_UDID={device['udid']}")
+                  print(f"SIMULATOR_NAME={device['name']}")
+                  break
+          else:
+              raise SystemExit("No available iPhone simulator was found")
+          PY
+
+      - name: Boot clean simulator
+        shell: bash
+        run: |
+          xcrun simctl shutdown all || true
+          xcrun simctl erase "$SIMULATOR_UDID"
+          xcrun simctl boot "$SIMULATOR_UDID"
+          xcrun simctl bootstatus "$SIMULATOR_UDID" -b
+          echo "Running UI tests on $SIMULATOR_NAME ($SIMULATOR_UDID)"
+
+      - name: Run iOS simulator UI tests
+        working-directory: android-app/ios
+        shell: bash
+        run: |
+          mkdir -p TestArtifacts
+          set -o pipefail
           xcodebuild \
             -project App/App.xcodeproj \
             -scheme App \
             -configuration Debug \
-            -sdk iphonesimulator \
-            -destination "generic/platform=iOS Simulator" \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
             -derivedDataPath DerivedData \
+            -resultBundlePath TestArtifacts/AppUITests.xcresult \
             CODE_SIGNING_ALLOWED=NO \
-            build
+            test | tee TestArtifacts/xcodebuild.log
+
+      - name: Collect simulator evidence
+        if: always()
+        working-directory: android-app/ios
+        shell: bash
+        run: |
+          mkdir -p TestArtifacts/screenshots TestArtifacts/logs
+          xcrun simctl io "$SIMULATOR_UDID" screenshot TestArtifacts/screenshots/final-state.png || true
+          xcrun simctl spawn "$SIMULATOR_UDID" log show \
+            --style compact \
+            --last 20m \
+            --predicate 'process == "App"' \
+            > TestArtifacts/logs/app.log 2>&1 || true
+          if [ -d TestArtifacts/AppUITests.xcresult ]; then
+            xcrun xcresulttool export attachments \
+              --path TestArtifacts/AppUITests.xcresult \
+              --output-path TestArtifacts/screenshots \
+              || true
+          fi
+          xcrun simctl list devices | grep "$SIMULATOR_UDID" > TestArtifacts/logs/simulator.txt || true
+
+      - name: Upload simulator screenshots and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-test-${{ github.run_number }}
+          path: android-app/ios/TestArtifacts/
+          if-no-files-found: error
+          retention-days: 14
