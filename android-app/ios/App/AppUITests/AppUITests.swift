@@ -52,9 +52,12 @@ final class AppUITests: XCTestCase {
         XCTAssertTrue(savedCourse.waitForExistence(timeout: 10), "课程保存后未显示在课表中")
         capture("03-course-added")
 
-        app.buttons["返回首页"].tap()
-        app.buttons["同步"].tap()
-        XCTAssertTrue(app.staticTexts["同步课表"].waitForExistence(timeout: 5))
+        returnToHome()
+
+        let syncButton = app.buttons["同步"]
+        XCTAssertTrue(syncButton.waitForExistence(timeout: 10), "首页底部导航未显示同步入口")
+        syncButton.tap()
+        XCTAssertTrue(app.staticTexts["同步课表"].waitForExistence(timeout: 10), "未进入同步课表页面")
         XCTAssertTrue(app.staticTexts["非官方学生工具。密码仅用于本次连接且不会保存；课表与同步记录只保存在本机。"].exists)
 
         app.buttons["隐私说明"].tap()
@@ -62,11 +65,13 @@ final class AppUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["课序是学生个人开发的非官方课程表工具，与学校不存在隶属或授权关系。"].exists)
         capture("04-privacy")
         app.buttons["我已了解"].tap()
+        XCTAssertTrue(app.staticTexts["同步课表"].waitForExistence(timeout: 10), "隐私说明关闭后未返回同步页面")
 
-        app.buttons["设置"].tap()
-        XCTAssertTrue(app.staticTexts["设置"].waitForExistence(timeout: 5))
+        let settingsButton = app.buttons["设置"]
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 10), "同步页面底部导航未显示设置入口")
+        settingsButton.tap()
+        XCTAssertTrue(app.staticTexts["课序 0.5.2"].waitForExistence(timeout: 10), "未进入设置页面")
         XCTAssertTrue(app.staticTexts["隐私与非官方说明"].exists)
-        XCTAssertTrue(app.staticTexts["课序 0.5.2"].exists)
         capture("05-settings")
     }
 
@@ -81,5 +86,18 @@ final class AppUITests: XCTestCase {
         app.textFields.matching(
             NSPredicate(format: "placeholderValue == %@", placeholder)
         ).firstMatch
+    }
+
+    private func returnToHome() {
+        let homeButton = app.buttons["首页"]
+        for _ in 0..<2 {
+            let backButton = app.buttons["返回首页"]
+            XCTAssertTrue(backButton.waitForExistence(timeout: 10), "全部课表页未显示返回按钮")
+            backButton.tap()
+            if homeButton.waitForExistence(timeout: 5) {
+                return
+            }
+        }
+        XCTFail("从全部课表页返回首页失败")
     }
 }
