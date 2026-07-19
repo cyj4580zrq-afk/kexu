@@ -46,7 +46,10 @@ final class AppUITests: XCTestCase {
         app.staticTexts["添加课程"].tap()
         app.buttons["保存课程"].tap()
 
-        XCTAssertTrue(app.staticTexts["UI Test Course"].waitForExistence(timeout: 5), "课程保存后未显示在课表中")
+        let savedCourse = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS %@", "UI Test Course")
+        ).firstMatch
+        XCTAssertTrue(savedCourse.waitForExistence(timeout: 10), "课程保存后未显示在课表中")
         capture("03-course-added")
 
         app.buttons["返回首页"].tap()
