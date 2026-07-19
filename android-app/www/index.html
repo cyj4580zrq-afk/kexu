@@ -260,11 +260,15 @@
             <app-icon :name="syncLoading ? 'LoaderCircle' : 'RefreshCw'" :size="20" :class="{ spinning: syncLoading }"></app-icon>
             {{ syncLoading ? syncStep : '登录并同步课表' }}
           </button>
+          <label class="consent-row">
+            <input v-model="privacyConsent" type="checkbox">
+            <span>我已阅读并同意<button type="button" @click.prevent="privacyVisible = true">隐私说明</button></span>
+          </label>
         </form>
 
         <div class="privacy-note">
           <app-icon name="ShieldCheck" :size="18"></app-icon>
-          <p>密码仅用于本次连接教务系统，不会保存在手机中。同步完成后会自动保存课表快照。</p>
+          <p>非官方学生工具。密码仅用于本次连接且不会保存；课表与同步记录只保存在本机。</p>
         </div>
 
         <details class="fallback-import">
@@ -395,7 +399,16 @@
           </button>
         </div>
 
-        <p class="version-text">课序 0.5.0</p>
+        <div class="settings-group">
+          <h2>关于</h2>
+          <button type="button" class="setting-row" @click="privacyVisible = true">
+            <span class="setting-icon green"><app-icon name="ShieldCheck" :size="19"></app-icon></span>
+            <span><strong>隐私与非官方说明</strong><small>查看数据处理方式与使用边界</small></span>
+            <app-icon name="ChevronRight" :size="18"></app-icon>
+          </button>
+        </div>
+
+        <p class="version-text">课序 0.5.1</p>
       </section>
     </main>
 
@@ -483,6 +496,23 @@
           <button type="button" @click="exitConfirmVisible = false">继续使用</button>
           <button type="button" class="confirm-exit" @click="exitApplication">退出应用</button>
         </div>
+      </section>
+    </div>
+
+    <div v-if="privacyVisible" class="sheet-overlay" @click.self="privacyVisible = false">
+      <section class="bottom-sheet privacy-sheet" role="dialog" aria-modal="true" aria-labelledby="privacy-title">
+        <div class="sheet-handle"></div>
+        <header><h2 id="privacy-title">隐私说明</h2><button type="button" aria-label="关闭" @click="privacyVisible = false"><app-icon name="X" :size="21"></app-icon></button></header>
+        <div class="privacy-content">
+          <p class="privacy-emphasis">课序是学生个人开发的非官方课程表工具，与学校不存在隶属或授权关系。</p>
+          <h3>数据如何处理</h3>
+          <p>教务密码仅用于当次加密登录，不写入本地存储，也不会发送给开发者。学号、课表和同步快照只保存在当前设备。</p>
+          <h3>网络访问</h3>
+          <p>同步由你的设备直接连接学校教务系统，只查询当前账号有权查看的本人课表。应用不批量抓取、不绕过验证码或访问控制。</p>
+          <h3>第三方与删除</h3>
+          <p>应用不含广告、统计 SDK 或开发者数据服务器。可在设置中清空课程；卸载应用可删除全部本地数据。</p>
+        </div>
+        <button type="button" class="primary-button privacy-confirm" @click="privacyConsent = true; privacyVisible = false">我已了解</button>
       </section>
     </div>
   </div>

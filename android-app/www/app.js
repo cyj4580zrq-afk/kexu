@@ -21,7 +21,8 @@ const STORAGE = {
   scheduleView: "campusflow-schedule-view",
   periodDuration: "campusflow-period-duration",
   username: "campusflow-school-username",
-  semester: "campusflow-school-semester"
+  semester: "campusflow-school-semester",
+  privacyConsent: "campusflow-privacy-consent"
 };
 
 const WEEK_DAYS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
@@ -195,6 +196,7 @@ createApp({
       weekSheetVisible: false,
       weekSheetMode: "view",
       semesterSheetVisible: false,
+      privacyVisible: false,
       detailVisible: false,
       addVisible: false,
       activeCourse: null,
@@ -216,6 +218,7 @@ createApp({
       nativeApp: null,
       backButtonListener: null,
       showPassword: false,
+      privacyConsent: localStorage.getItem(STORAGE.privacyConsent) === "true",
       syncLoading: false,
       syncStep: "正在连接教务系统",
       schoolStatus: { type: "unknown", text: "等待连接" },
@@ -378,6 +381,7 @@ createApp({
     hapticsEnabled(value) { localStorage.setItem(STORAGE.hapticsEnabled, String(value)); },
     scheduleView(value) { localStorage.setItem(STORAGE.scheduleView, value); },
     periodDuration(value) { localStorage.setItem(STORAGE.periodDuration, String(value)); },
+    privacyConsent(value) { localStorage.setItem(STORAGE.privacyConsent, String(value)); },
     selectedWeek(value) {
       localStorage.setItem(STORAGE.selectedWeek, String(value));
     }
@@ -411,6 +415,10 @@ createApp({
       }
       if (this.detailVisible) {
         this.detailVisible = false;
+        return;
+      }
+      if (this.privacyVisible) {
+        this.privacyVisible = false;
         return;
       }
       if (this.addVisible) {
@@ -506,6 +514,11 @@ createApp({
       }
     },
     async syncFromSchool() {
+      if (!this.privacyConsent) {
+        this.notify("请先阅读并同意隐私说明", "warning");
+        this.privacyVisible = true;
+        return;
+      }
       if (!this.syncForm.username || !this.syncForm.password) {
         this.notify("请填写学号和密码", "warning");
         return;

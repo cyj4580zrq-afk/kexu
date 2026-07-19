@@ -1,5 +1,6 @@
 # Local and generated files
 .playwright-cli/
+output/playwright/
 __pycache__/
 *.py[cod]
 *.log
@@ -27,6 +28,7 @@ android-app/android/capacitor-cordova-android-plugins/
 *.aab
 *.jks
 *.keystore
+android-app/release-signing/
 
 # iOS and Xcode build output
 .DS_Store

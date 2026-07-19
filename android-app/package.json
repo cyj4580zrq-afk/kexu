@@ -1,13 +1,13 @@
 {
   "name": "kexu-mobile",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "description": "课序 Android 与 iOS 课程表",
   "scripts": {
     "sync": "cap sync && node scripts/fix-ios-package-paths.mjs",
     "sync:android": "cap sync android",
     "sync:ios": "cap sync ios && node scripts/fix-ios-package-paths.mjs",
-    "build:apk": "cd android && gradlew.bat assembleDebug",
+    "build:apk": "cd android && gradlew.bat assembleRelease",
     "open:ios": "cap open ios"
   },
   "dependencies": {
