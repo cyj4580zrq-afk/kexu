@@ -56,20 +56,33 @@ final class AppUITests: XCTestCase {
         syncButton.tap()
         XCTAssertTrue(app.staticTexts["同步课表"].waitForExistence(timeout: 10), "未进入同步课表页面")
         XCTAssertTrue(app.staticTexts["非官方学生工具。密码仅用于本次连接且不会保存；课表与同步记录只保存在本机。"].exists)
-
-        app.buttons["隐私说明"].tap()
-        XCTAssertTrue(app.staticTexts["隐私说明"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["课序是学生个人开发的非官方课程表工具，与学校不存在隶属或授权关系。"].exists)
-        capture("04-privacy")
-        app.buttons["我已了解"].tap()
-        XCTAssertTrue(app.staticTexts["同步课表"].waitForExistence(timeout: 10), "隐私说明关闭后未返回同步页面")
+        capture("04-sync")
 
         let settingsButton = app.buttons["设置"]
         XCTAssertTrue(settingsButton.waitForExistence(timeout: 10), "同步页面底部导航未显示设置入口")
-        settingsButton.tap()
+        for _ in 0..<2 {
+            app.buttons["设置"].tap()
+            if app.staticTexts["PREFERENCES"].waitForExistence(timeout: 8) {
+                break
+            }
+        }
         XCTAssertTrue(app.staticTexts["课序 0.5.2"].waitForExistence(timeout: 10), "未进入设置页面")
         XCTAssertTrue(app.staticTexts["隐私与非官方说明"].exists)
         capture("05-settings")
+
+        let privacyButton = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS %@", "隐私与非官方说明")
+        ).firstMatch
+        for _ in 0..<4 where !privacyButton.isHittable {
+            app.swipeUp()
+        }
+        XCTAssertTrue(privacyButton.waitForExistence(timeout: 10), "设置页未显示隐私说明入口")
+        privacyButton.tap()
+        XCTAssertTrue(app.staticTexts["隐私说明"].waitForExistence(timeout: 10), "未打开隐私说明")
+        XCTAssertTrue(app.staticTexts["课序是学生个人开发的非官方课程表工具，与学校不存在隶属或授权关系。"].exists)
+        capture("06-privacy")
+        app.buttons["我已了解"].tap()
+        XCTAssertTrue(app.staticTexts["课序 0.5.2"].waitForExistence(timeout: 10), "隐私说明关闭后未返回设置页面")
     }
 
     private func capture(_ name: String) {
