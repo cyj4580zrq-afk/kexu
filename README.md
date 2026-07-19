@@ -51,6 +51,22 @@ cd android
 
 调试 APK 会生成在 `android-app/android/app/build/outputs/apk/debug/`。
 
+## 版本发布
+
+公开版本统一使用 `vX.Y.Z` 标签。发布前必须同时完成以下调整：
+
+1. 更新 `android-app/package.json`、`package-lock.json`、`android/app/build.gradle` 和应用内显示的版本号。
+2. 在 `CHANGELOG.md` 顶部增加对应版本及更新内容。
+3. 提交并推送代码，然后创建并推送同版本标签。
+
+```powershell
+git tag v0.4.0
+git push origin main
+git push origin v0.4.0
+```
+
+标签推送后，GitHub Actions 会自动构建 APK、创建 GitHub Release，并附上 `CHANGELOG.md` 中该版本的更新内容。版本号不一致或缺少更新日志时，发布会停止，避免生成信息不完整的安装包。
+
 ## 数据与隐私
 
 教务密码仅用于当次登录请求，不会写入本地存储。课程和同步快照保存在用户设备中。教务系统不可用时，已经同步的课表仍可离线查看。
