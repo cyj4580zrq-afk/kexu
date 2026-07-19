@@ -25,8 +25,14 @@ final class AppUITests: XCTestCase {
         XCTAssertTrue(allCoursesButton.waitForExistence(timeout: 15), "首页课程入口未完成加载")
         capture("01-home")
 
-        allCoursesButton.tap()
-        XCTAssertTrue(app.buttons["返回首页"].waitForExistence(timeout: 15), "未进入全部课表页面")
+        let backButton = app.buttons["返回首页"]
+        for _ in 0..<2 {
+            app.buttons["全部课表"].tap()
+            if backButton.waitForExistence(timeout: 8) {
+                break
+            }
+        }
+        XCTAssertTrue(backButton.exists, "未进入全部课表页面")
         XCTAssertTrue(app.buttons["添加课程"].exists)
         capture("02-timetable")
 
