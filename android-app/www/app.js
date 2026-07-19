@@ -5,9 +5,14 @@ const LOGIN_URL = `${SCHOOL_BASE}/xtgl/login_slogin.html`;
 const PUBKEY_URL = `${SCHOOL_BASE}/xtgl/login_getPublicKey.html`;
 const SCHEDULE_URL = `${SCHOOL_BASE}/kbcx/xskbcx_cxXsKb.html?gnmkdm=N2151`;
 const SCHEDULE_REFERER = `${SCHOOL_BASE}/kbcx/xskbcx_cxXskbcxIndex.html?gnmkdm=N2151`;
+const GRADE_URL = `${SCHOOL_BASE}/cjcx/cjcx_cxXsgrcj.html?doType=query`;
+const GRADE_REFERER = `${SCHOOL_BASE}/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005`;
+const GRADE_DETAIL_URL = `${SCHOOL_BASE}/cjcx/cjcx_cxCjxqGjh.html`;
 const STORAGE = {
   courses: "campusflow-courses",
   history: "campusflow-sync-history",
+  grades: "campusflow-grades",
+  gradeHistory: "campusflow-grade-history",
   currentWeek: "campusflow-current-week",
   selectedWeek: "campusflow-selected-week",
   theme: "campusflow-theme",
@@ -185,6 +190,7 @@ createApp({
       tabs: [
         { value: "schedule", label: "首页", icon: "House" },
         { value: "sync", label: "同步", icon: "RefreshCw" },
+        { value: "grades", label: "成绩", icon: "ChartNoAxesCombined" },
         { value: "history", label: "记录", icon: "History" },
         { value: "settings", label: "设置", icon: "Settings" }
       ],
@@ -198,10 +204,16 @@ createApp({
       semesterSheetVisible: false,
       privacyVisible: false,
       detailVisible: false,
+      gradeDetailVisible: false,
       addVisible: false,
       activeCourse: null,
+      activeGrade: null,
       courses: readJson(STORAGE.courses, []),
       syncHistory: readJson(STORAGE.history, []),
+      grades: readJson(STORAGE.grades, []),
+      gradeHistory: readJson(STORAGE.gradeHistory, []),
+      selectedGradeSemester: "全部",
+      gradeDetailLoading: false,
       themeMode: localStorage.getItem(STORAGE.themeMode) || (localStorage.getItem(STORAGE.theme) === "dark" ? "dark" : "system"),
       accentOptions: ["#2577f5", "#7857e8", "#16a085", "#ee6b4d"],
       accentColor: localStorage.getItem(STORAGE.accent) || "#2577f5",
@@ -360,6 +372,22 @@ createApp({
     lastSyncText() {
       if (!this.syncHistory.length) return "尚未同步过课表";
       return `上次同步：${this.formatDate(this.syncHistory[0].syncedAt)}`;
+    },
+    gradeSemesters() {
+      return [...new Set(this.grades.map(grade => grade.semester).filter(Boolean))];
+    },
+    visibleGrades() {
+      const source = this.selectedGradeSemester === "全部"
+        ? this.grades
+        : this.grades.filter(grade => grade.semester === this.selectedGradeSemester);
+      return [...source].sort((a, b) => String(b.semester).localeCompare(String(a.semester)) || String(a.name).localeCompare(String(b.name), "zh-CN"));
+    },
+    gradeAverage() {
+      const values = this.visibleGrades.map(grade => Number(grade.score)).filter(Number.isFinite);
+      return values.length ? (values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1) : "--";
+    },
+    gradeCredits() {
+      return this.visibleGrades.reduce((sum, grade) => sum + (Number(grade.credit) || 0), 0).toFixed(1);
     }
   },
   watch: {
@@ -415,6 +443,10 @@ createApp({
       }
       if (this.detailVisible) {
         this.detailVisible = false;
+        return;
+      }
+      if (this.gradeDetailVisible) {
+        this.gradeDetailVisible = false;
         return;
       }
       if (this.privacyVisible) {
@@ -591,21 +623,31 @@ createApp({
         const rawCourses = payload && (payload.kbList || payload.data || []);
         if (!Array.isArray(rawCourses)) throw new Error("教务系统返回了无法识别的课表数据");
         const newCourses = rawCourses.map((course, index) => this.normalizeSchoolCourse(course, index));
-        if (!newCourses.length) {
-          this.notify((payload && (payload.message || payload.msg)) || "该学期暂未查询到课程", "warning");
-          this.schoolStatus = { type: "online", text: "可连接" };
-          return;
+        if (newCourses.length) {
+          this.courses = newCourses;
+          this.persistCourses();
+          this.saveSnapshot("教务系统直接同步", this.syncForm.semester, newCourses);
         }
 
-        this.courses = newCourses;
-        this.persistCourses();
-        this.saveSnapshot("教务系统直接同步", this.syncForm.semester, newCourses);
+        let gradeMessage = "";
+        try {
+          this.syncStep = "正在获取成绩";
+          const rawGrades = await this.fetchSchoolGrades(startYear, term === "1" ? "3" : "12");
+          const newGrades = rawGrades.map((grade, index) => this.normalizeSchoolGrade(grade, index));
+          this.grades = newGrades;
+          this.persistGrades();
+          this.saveGradeSnapshot(this.syncForm.semester, newGrades);
+          gradeMessage = `，${newGrades.length} 门成绩`;
+        } catch (gradeError) {
+          gradeMessage = "，成绩暂未同步";
+          console.warn("Grade synchronization failed", gradeError);
+        }
         localStorage.setItem(STORAGE.username, this.syncForm.username);
         localStorage.setItem(STORAGE.semester, this.syncForm.semester);
         this.syncForm.password = "";
         this.selectedDay = "全部";
         this.schoolStatus = { type: "online", text: "同步成功" };
-        this.notify(`已同步 ${newCourses.length} 门课程`);
+        this.notify(`已同步 ${newCourses.length} 门课程${gradeMessage}`);
         this.activeTab = "schedule";
       } catch (error) {
         this.schoolStatus = { type: "offline", text: error.status === 401 ? "登录失败" : "连接失败" };
@@ -632,6 +674,121 @@ createApp({
         note: "同步自武汉纺织大学外经贸学院教务系统",
         source: "whcibe"
       };
+    },
+    async fetchSchoolGrades(startYear, term) {
+      const response = await this.httpRequest("POST", GRADE_URL, {
+        responseType: "json",
+        data: {
+          xnm: startYear,
+          xqm: term,
+          kcbj: "",
+          page: "1",
+          rows: "200",
+          sidx: "",
+          sord: "asc",
+          _search: "false",
+          nd: String(Date.now())
+        },
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+          Accept: "application/json, text/javascript, */*; q=0.01",
+          Origin: SCHOOL_BASE,
+          Referer: GRADE_REFERER,
+          "X-Requested-With": "XMLHttpRequest"
+        }
+      });
+      const payload = responseData(response);
+      const rows = payload && (payload.items || payload.rows || payload.data || []);
+      if (!Array.isArray(rows)) throw new Error("教务系统返回了无法识别的成绩数据");
+      return rows;
+    },
+    normalizeSchoolGrade(item, index) {
+      const semester = item.xnmmc && item.xqmmc ? `${item.xnmmc} 第${item.xqmmc}学期` : this.selectedSemesterLabel;
+      return {
+        id: `grade-${item.key || item.jxb_id || item.kch || Date.now() + index}`,
+        name: item.kcmc || item.courseName || "未知课程",
+        semester,
+        score: item.cj ?? item.bfzcj ?? item.bfzcj1 ?? "--",
+        credit: item.xf ?? "--",
+        gpa: item.jd ?? "--",
+        courseType: item.kcxzmc || item.kclbmc || "课程成绩",
+        examType: item.ksxz || item.khxz || "--",
+        remark: item.cjbz || "",
+        components: this.extractGradeComponents(item),
+        remote: {
+          jxbId: item.jxb_id || item.jxbid || "",
+          xnm: item.xnm || "",
+          xqm: item.xqm || "",
+          kcmc: item.kcmc || ""
+        },
+        detailFetched: false,
+        source: "whcibe"
+      };
+    },
+    extractGradeComponents(item) {
+      const fields = [
+        ["平时", item.pscj], ["期中", item.qzcj], ["实验", item.sycj], ["期末", item.qmcj], ["总评", item.cj ?? item.bfzcj ?? item.bfzcj1]
+      ];
+      return fields
+        .filter(([, value]) => value !== undefined && value !== null && value !== "")
+        .map(([label, value]) => ({ label, value: String(value), weight: "" }));
+    },
+    persistGrades() {
+      localStorage.setItem(STORAGE.grades, JSON.stringify(this.grades));
+    },
+    saveGradeSnapshot(semester, grades) {
+      this.gradeHistory.unshift({
+        id: Date.now(),
+        semester,
+        syncedAt: new Date().toISOString(),
+        gradeCount: grades.length,
+        grades: JSON.parse(JSON.stringify(grades))
+      });
+      this.gradeHistory = this.gradeHistory.slice(0, 20);
+      localStorage.setItem(STORAGE.gradeHistory, JSON.stringify(this.gradeHistory));
+    },
+    async openGrade(grade) {
+      this.activeGrade = grade;
+      this.gradeDetailVisible = true;
+      this.tapFeedback();
+      if (grade.detailFetched || !grade.remote || !grade.remote.jxbId) return;
+      this.gradeDetailLoading = true;
+      try {
+        const response = await this.httpRequest("GET", GRADE_DETAIL_URL, {
+          params: {
+            jxb_id: grade.remote.jxbId,
+            xnm: grade.remote.xnm,
+            xqm: grade.remote.xqm,
+            kcmc: grade.remote.kcmc
+          },
+          headers: { Referer: GRADE_REFERER }
+        });
+        const components = this.parseGradeDetailHtml(htmlText(response));
+        if (components.length) grade.components = components;
+        grade.detailFetched = true;
+        this.persistGrades();
+      } catch (_error) {
+        this.notify("暂时无法获取该课程的成绩明细，已保留总评", "info");
+      } finally {
+        this.gradeDetailLoading = false;
+      }
+    },
+    parseGradeDetailHtml(html) {
+      const documentNode = new DOMParser().parseFromString(html, "text/html");
+      const components = [];
+      const seen = new Set();
+      documentNode.querySelectorAll("tr").forEach(row => {
+        const cells = [...row.querySelectorAll("th, td")].map(cell => cell.textContent.replace(/\s+/g, " ").trim()).filter(Boolean);
+        for (let index = 0; index + 1 < cells.length; index += 2) {
+          const label = cells[index].replace(/[：:]/g, "");
+          const value = cells[index + 1];
+          if (!/(平时|期中|期末|实验|作业|课堂|总评|考试)/.test(label) || !value || seen.has(label)) continue;
+          const weightMatch = `${label} ${value}`.match(/(\d+(?:\.\d+)?)\s*%/);
+          components.push({ label, value: value.replace(/\s*\d+(?:\.\d+)?\s*%/, "").trim(), weight: weightMatch ? `${weightMatch[1]}%` : "" });
+          seen.add(label);
+        }
+      });
+      return components;
     },
     importFromHtml() {
       if (!this.importHtml.trim()) {

@@ -280,7 +280,7 @@ body.dark .focus-topline em { background: rgba(0,0,0,.07); }
   bottom: 0;
   left: 0;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   height: calc(68px + var(--safe-bottom));
   max-width: 680px;
   margin: auto;
@@ -348,6 +348,41 @@ body.dark .focus-topline em { background: rgba(0,0,0,.07); }
 .history-copy small { color: var(--blue); font-size: 10px; }
 .restore-button { padding: 8px 10px; border: 0; border-radius: 6px; background: var(--blue-soft); color: var(--blue); font-size: 12px; font-weight: 700; }
 .history-empty { min-height: 58vh; }
+
+.grade-overview { display: grid; grid-template-columns: repeat(3, 1fr); overflow: hidden; margin: 2px 0 18px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.grade-overview > div { display: grid; min-width: 0; gap: 7px; padding: 15px 10px; text-align: center; border-right: 1px solid var(--line); }
+.grade-overview > div:last-child { border-right: 0; }
+.grade-overview span { color: var(--muted); font-size: 10px; }
+.grade-overview strong { overflow: hidden; color: var(--text); font-size: 21px; line-height: 1; text-overflow: ellipsis; white-space: nowrap; }
+.grade-filter { display: flex; gap: 7px; margin: 0 -20px 16px; padding: 0 20px 4px; overflow-x: auto; scrollbar-width: none; }
+.grade-filter::-webkit-scrollbar { display: none; }
+.grade-filter button { height: 32px; flex: none; padding: 0 12px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--muted); font-size: 11px; font-weight: 700; }
+.grade-filter button.active { border-color: var(--blue); background: var(--blue); color: #fff; }
+.grade-list { display: grid; gap: 9px; }
+.grade-row { display: grid; grid-template-columns: 48px minmax(0,1fr) 18px; min-height: 80px; align-items: center; gap: 12px; padding: 11px 12px; text-align: left; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); box-shadow: 0 3px 12px rgba(31,45,68,.04); }
+.grade-score { display: grid; width: 46px; height: 46px; place-items: center; border-radius: 8px; background: var(--surface-muted); color: var(--text); font-size: 17px; font-weight: 800; }
+.grade-score.passing { background: #e4f7ee; color: #188a5c; }
+.grade-score.failing { background: var(--red-soft); color: var(--red); }
+.grade-copy { display: grid; min-width: 0; gap: 4px; }
+.grade-copy strong, .grade-copy small, .grade-copy em { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.grade-copy strong { font-size: 14px; }
+.grade-copy small { color: var(--muted); font-size: 10px; }
+.grade-copy em { color: var(--blue); font-size: 10px; font-style: normal; font-weight: 700; }
+.grade-empty { min-height: 58vh; }
+.grade-detail-sheet { min-height: 330px; }
+.grade-detail-total { display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: 13px; padding: 17px; border: 1px solid var(--line); border-radius: 8px; background: var(--blue-soft); }
+.grade-detail-total span { color: var(--muted); font-size: 12px; }
+.grade-detail-total strong { justify-self: end; color: var(--blue); font-size: 33px; line-height: 1; }
+.grade-detail-total em { grid-column: 1 / -1; margin-top: 8px; color: var(--muted); font-size: 11px; font-style: normal; }
+.grade-components { display: grid; margin-top: 16px; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; }
+.grade-components > div { display: grid; grid-template-columns: 1fr auto auto; min-height: 50px; align-items: center; gap: 10px; padding: 0 14px; border-bottom: 1px solid var(--line); }
+.grade-components > div:last-child { border-bottom: 0; }
+.grade-components span { color: var(--muted); font-size: 13px; }
+.grade-components strong { font-size: 15px; }
+.grade-components em { min-width: 34px; color: var(--blue); font-size: 11px; font-style: normal; text-align: right; }
+.grade-detail-loading, .grade-detail-empty { display: flex; min-height: 78px; align-items: center; justify-content: center; gap: 8px; margin: 16px 0; color: var(--muted); font-size: 12px; text-align: center; }
+.grade-detail-meta { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 15px; }
+.grade-detail-meta span { padding: 5px 8px; border-radius: 5px; background: var(--surface-muted); color: var(--muted); font-size: 10px; }
 
 .settings-group { display: grid; gap: 8px; margin-bottom: 24px; }
 .settings-group h2 { margin: 0 0 8px 2px; color: var(--muted); font-size: 12px; font-weight: 650; }

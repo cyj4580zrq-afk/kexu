@@ -58,6 +58,12 @@ final class AppUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["非官方学生工具。密码仅用于本次连接且不会保存；课表与同步记录只保存在本机。"].exists)
         capture("04-sync")
 
+        let gradesButton = app.buttons["成绩"]
+        XCTAssertTrue(gradesButton.waitForExistence(timeout: 10), "同步页面底部导航未显示成绩入口")
+        gradesButton.tap()
+        XCTAssertTrue(app.staticTexts["还没有成绩记录"].waitForExistence(timeout: 10), "未进入成绩页面")
+        capture("05-grades")
+
         let settingsButton = app.buttons["设置"]
         XCTAssertTrue(settingsButton.waitForExistence(timeout: 10), "同步页面底部导航未显示设置入口")
         for _ in 0..<2 {
@@ -66,8 +72,8 @@ final class AppUITests: XCTestCase {
                 break
             }
         }
-        XCTAssertTrue(app.staticTexts["课序 0.5.2"].waitForExistence(timeout: 10), "未进入设置页面")
-        capture("05-settings")
+        XCTAssertTrue(app.staticTexts["课序 0.5.3"].waitForExistence(timeout: 10), "未进入设置页面")
+        capture("06-settings")
 
         let privacyButton = app.buttons.matching(
             NSPredicate(format: "label CONTAINS %@", "隐私与非官方说明")
@@ -79,9 +85,9 @@ final class AppUITests: XCTestCase {
         privacyButton.tap()
         XCTAssertTrue(app.staticTexts["隐私说明"].waitForExistence(timeout: 10), "未打开隐私说明")
         XCTAssertTrue(app.staticTexts["课序是学生个人开发的非官方课程表工具，与学校不存在隶属或授权关系。"].exists)
-        capture("06-privacy")
+        capture("07-privacy")
         app.buttons["我已了解"].tap()
-        XCTAssertTrue(app.staticTexts["课序 0.5.2"].waitForExistence(timeout: 10), "隐私说明关闭后未返回设置页面")
+        XCTAssertTrue(app.staticTexts["课序 0.5.3"].waitForExistence(timeout: 10), "隐私说明关闭后未返回设置页面")
     }
 
     private func capture(_ name: String) {

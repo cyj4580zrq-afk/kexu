@@ -258,7 +258,7 @@
 
           <button class="primary-button" type="submit" :disabled="syncLoading">
             <app-icon :name="syncLoading ? 'LoaderCircle' : 'RefreshCw'" :size="20" :class="{ spinning: syncLoading }"></app-icon>
-            {{ syncLoading ? syncStep : '登录并同步课表' }}
+            {{ syncLoading ? syncStep : '登录并同步课程与成绩' }}
           </button>
           <label class="consent-row">
             <input v-model="privacyConsent" type="checkbox">
@@ -277,6 +277,46 @@
           <textarea v-model="importHtml" rows="5" placeholder="粘贴完整课表页面源码"></textarea>
           <button type="button" class="secondary-button" @click="importFromHtml">解析并导入</button>
         </details>
+      </section>
+
+      <section v-else-if="activeTab === 'grades'" class="page standard-page grades-page">
+        <header class="page-header">
+          <div>
+            <p class="brand-line">ACADEMIC</p>
+            <h1>成绩</h1>
+          </div>
+          <button class="icon-button" type="button" aria-label="前往同步" @click="activeTab = 'sync'"><app-icon name="RefreshCw" :size="20"></app-icon></button>
+        </header>
+
+        <section class="grade-overview">
+          <div><span>平均成绩</span><strong>{{ gradeAverage }}</strong></div>
+          <div><span>课程数量</span><strong>{{ visibleGrades.length }}</strong></div>
+          <div><span>累计学分</span><strong>{{ gradeCredits }}</strong></div>
+        </section>
+
+        <div class="grade-filter" v-if="gradeSemesters.length">
+          <button type="button" :class="{ active: selectedGradeSemester === '全部' }" @click="selectedGradeSemester = '全部'">全部</button>
+          <button v-for="semester in gradeSemesters" :key="semester" type="button" :class="{ active: selectedGradeSemester === semester }" @click="selectedGradeSemester = semester">{{ semester }}</button>
+        </div>
+
+        <div v-if="visibleGrades.length" class="grade-list">
+          <button v-for="grade in visibleGrades" :key="grade.id" class="grade-row" type="button" @click="openGrade(grade)">
+            <span class="grade-score" :class="{ passing: Number(grade.score) >= 60, failing: Number(grade.score) < 60 }">{{ grade.score }}</span>
+            <span class="grade-copy">
+              <strong>{{ grade.name }}</strong>
+              <small>{{ grade.semester }} · {{ grade.credit }} 学分 · 绩点 {{ grade.gpa }}</small>
+              <em v-if="grade.components.length">{{ grade.components.map(item => item.label).join(' / ') }}</em>
+            </span>
+            <app-icon name="ChevronRight" :size="18"></app-icon>
+          </button>
+        </div>
+
+        <div v-else class="empty-state grade-empty">
+          <span class="empty-icon"><app-icon name="ChartNoAxesCombined" :size="30"></app-icon></span>
+          <h2>还没有成绩记录</h2>
+          <p>登录教务系统后，课程与成绩会一起同步到本机</p>
+          <button class="secondary-button compact" type="button" @click="activeTab = 'sync'">去同步</button>
+        </div>
       </section>
 
       <section v-else-if="activeTab === 'history'" class="page standard-page">
@@ -408,7 +448,7 @@
           </button>
         </div>
 
-        <p class="version-text">课序 0.5.2</p>
+        <p class="version-text">课序 0.5.3</p>
       </section>
     </main>
 
@@ -467,6 +507,20 @@
           <div><dt><app-icon name="CalendarRange" :size="18"></app-icon>上课周次</dt><dd>{{ normalizeWeekRange(activeCourse.weekRange) }}</dd></div>
         </dl>
         <button type="button" class="danger-button" @click="deleteCourse(activeCourse.id)"><app-icon name="Trash2" :size="18"></app-icon>删除课程</button>
+      </section>
+    </div>
+
+    <div v-if="gradeDetailVisible && activeGrade" class="sheet-overlay" @click.self="gradeDetailVisible = false">
+      <section class="bottom-sheet grade-detail-sheet">
+        <div class="sheet-handle"></div>
+        <header><div><h2>{{ activeGrade.name }}</h2><p>{{ activeGrade.semester }} · {{ activeGrade.courseType }}</p></div><button type="button" aria-label="关闭" @click="gradeDetailVisible = false"><app-icon name="X" :size="21"></app-icon></button></header>
+        <div class="grade-detail-total"><span>总评</span><strong>{{ activeGrade.score }}</strong><em>绩点 {{ activeGrade.gpa }} · {{ activeGrade.credit }} 学分</em></div>
+        <div v-if="gradeDetailLoading" class="grade-detail-loading"><app-icon name="LoaderCircle" :size="18" class="spinning"></app-icon>正在读取成绩组成</div>
+        <div v-else-if="activeGrade.components.length" class="grade-components">
+          <div v-for="item in activeGrade.components" :key="item.label"><span>{{ item.label }}</span><strong>{{ item.value }}</strong><em v-if="item.weight">{{ item.weight }}</em></div>
+        </div>
+        <p v-else class="grade-detail-empty">教务系统暂未提供该课程的分项成绩，仅显示总评。</p>
+        <div class="grade-detail-meta"><span>{{ activeGrade.examType }}</span><span v-if="activeGrade.remark">{{ activeGrade.remark }}</span></div>
       </section>
     </div>
 

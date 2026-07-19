@@ -1,6 +1,6 @@
 {
   "name": "kexu-mobile",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "private": true,
   "description": "课序 Android 与 iOS 课程表",
   "scripts": {
