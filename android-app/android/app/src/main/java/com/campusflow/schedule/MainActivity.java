@@ -7,9 +7,10 @@ import android.window.OnBackAnimationCallback;
 import android.window.OnBackInvokedCallback;
 import android.window.OnBackInvokedDispatcher;
 import androidx.annotation.NonNull;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
-import androidx.core.graphics.Insets;
 import com.getcapacitor.BridgeActivity;
 import java.util.Locale;
 
@@ -25,7 +26,6 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // Request normal system-window fitting, then provide actual bar insets to CSS.
         WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
         getBridge().getWebView().postDelayed(this::publishSystemBarInsets, 250);
     }
@@ -52,41 +52,34 @@ public class MainActivity extends BridgeActivity {
         if (predictiveBackRegistered || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             predictiveBackCallback = new OnBackAnimationCallback() {
-                    @Override
-                    public void onBackStarted(@NonNull BackEvent backEvent) {
-                        predictiveGestureActive = true;
-                        predictiveGestureId++;
-                        sendPredictiveBackEvent("start", backEvent.getProgress(), backEvent.getSwipeEdge());
-                    }
+                @Override
+                public void onBackStarted(@NonNull BackEvent event) {
+                    predictiveGestureActive = true;
+                    predictiveGestureId++;
+                    sendPredictiveBackEvent("start", event.getProgress(), event.getSwipeEdge());
+                }
 
-                    @Override
-                    public void onBackProgressed(@NonNull BackEvent backEvent) {
-                        queuePredictiveBackProgress(backEvent.getProgress(), backEvent.getSwipeEdge());
-                    }
+                @Override
+                public void onBackProgressed(@NonNull BackEvent event) {
+                    queuePredictiveBackProgress(event.getProgress(), event.getSwipeEdge());
+                }
 
-                    @Override
-                    public void onBackInvoked() {
-                        invalidatePredictiveBackProgress();
-                        sendPredictiveBackEvent("complete", 1.0f, 0);
-                    }
+                @Override
+                public void onBackInvoked() {
+                    invalidatePredictiveBackProgress();
+                    sendPredictiveBackEvent("complete", 1f, 0);
+                }
 
-                    @Override
-                    public void onBackCancelled() {
-                        invalidatePredictiveBackProgress();
-                        sendPredictiveBackEvent("cancel", 0.0f, 0);
-                    }
-                };
+                @Override
+                public void onBackCancelled() {
+                    invalidatePredictiveBackProgress();
+                    sendPredictiveBackEvent("cancel", 0f, 0);
+                }
+            };
         } else {
-            predictiveBackCallback = new OnBackInvokedCallback() {
-                    @Override
-                    public void onBackInvoked() {
-                        sendPredictiveBackEvent("complete", 1.0f, 0);
-                    }
-                };
+            predictiveBackCallback = () -> sendPredictiveBackEvent("complete", 1f, 0);
         }
         getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
-            // Keep Capacitor's ordinary back callback from committing the page before
-            // the WebView has finished rendering the predictive-back progress.
             OnBackInvokedDispatcher.PRIORITY_OVERLAY,
             predictiveBackCallback
         );
@@ -105,7 +98,6 @@ public class MainActivity extends BridgeActivity {
         latestBackProgress = progress;
         latestBackSwipeEdge = swipeEdge;
         if (progressDispatchPending || getBridge() == null || getBridge().getWebView() == null) return;
-
         progressDispatchPending = true;
         final int gestureId = predictiveGestureId;
         getBridge().getWebView().postOnAnimation(() -> {
@@ -123,29 +115,25 @@ public class MainActivity extends BridgeActivity {
 
     private void sendPredictiveBackEvent(String action, float progress, int swipeEdge) {
         runOnUiThread(() -> {
-            if (getBridge() != null && getBridge().getWebView() != null) {
-                String script = String.format(
-                    Locale.US,
-                    "window.onPredictiveBackEvent && window.onPredictiveBackEvent('%s', %.4f, %d);",
-                    action, progress, swipeEdge
-                );
-                getBridge().getWebView().evaluateJavascript(script, null);
-            }
+            if (getBridge() == null || getBridge().getWebView() == null) return;
+            String script = String.format(
+                Locale.US,
+                "window.onPredictiveBackEvent && window.onPredictiveBackEvent('%s', %.4f, %d);",
+                action, progress, swipeEdge
+            );
+            getBridge().getWebView().evaluateJavascript(script, null);
         });
     }
 
     private void publishSystemBarInsets() {
-        WindowInsetsCompat windowInsets = WindowCompat.getInsetsController(getWindow(), getBridge().getWebView()) == null
-            ? null : androidx.core.view.ViewCompat.getRootWindowInsets(getBridge().getWebView());
+        WindowInsetsCompat windowInsets = ViewCompat.getRootWindowInsets(getBridge().getWebView());
         if (windowInsets == null) return;
         Insets bars = windowInsets.getInsets(
             WindowInsetsCompat.Type.statusBars() | WindowInsetsCompat.Type.navigationBars() | WindowInsetsCompat.Type.displayCutout()
         );
         float density = getResources().getDisplayMetrics().density;
-        float top = bars.top / density;
-        float bottom = bars.bottom / density;
-        String script = "document.documentElement.style.setProperty('--native-safe-top','" + top + "px');"
-            + "document.documentElement.style.setProperty('--native-safe-bottom','" + bottom + "px');"
+        String script = "document.documentElement.style.setProperty('--native-safe-top','" + (bars.top / density) + "px');"
+            + "document.documentElement.style.setProperty('--native-safe-bottom','" + (bars.bottom / density) + "px');"
             + "document.documentElement.classList.add('native-android');";
         getBridge().getWebView().evaluateJavascript(script, null);
     }

@@ -7,7 +7,8 @@ const SCHEDULE_URL = `${SCHOOL_BASE}/kbcx/xskbcx_cxXsKb.html?gnmkdm=N2151`;
 const SCHEDULE_REFERER = `${SCHOOL_BASE}/kbcx/xskbcx_cxXskbcxIndex.html?gnmkdm=N2151`;
 const GRADE_URL = `${SCHOOL_BASE}/cjcx/cjcx_cxXsgrcj.html?doType=query`;
 const GRADE_REFERER = `${SCHOOL_BASE}/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005`;
-const GRADE_DETAIL_URL = `${SCHOOL_BASE}/cjcx/cjcx_cxCjxqGjh.html`;
+const GRADE_DETAIL_URL = "http://jw.whcibe.com/cjcx/cjcx_cxCjxqGjh.html";
+const GRADE_DETAIL_REFERER = "http://jw.whcibe.com/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005&layout=default";
 const STORAGE = {
   courses: "campusflow-courses",
   history: "campusflow-sync-history",
@@ -248,6 +249,9 @@ createApp({
       predictiveBackTarget: null,
       predictiveBackKey: null,
       predictiveBackTimer: null,
+      tabTransitioning: false,
+      tabTransitionTimer: null,
+      suppressTabTransition: false,
       syncLoading: false,
       syncStep: "正在连接教务系统",
       gradeLoading: false,
@@ -419,6 +423,13 @@ createApp({
     }
   },
   watch: {
+    activeTab() {
+      if (this.suppressTabTransition || this.predictiveBackActive || this.predictiveBackCommitting || this.predictiveBackReturned) {
+        this.suppressTabTransition = false;
+        return;
+      }
+      this.playTabTransition();
+    },
     themeMode() {
       this.applyTheme();
       localStorage.setItem(STORAGE.themeMode, this.themeMode);
@@ -482,11 +493,36 @@ createApp({
     window.onPredictiveBackEvent = null;
     document.body.classList.remove("pb-active", "pb-cancelling", "pb-committing", "pb-returned", "liquid-glass", "nav-glass", "nav-clear-glass");
     if (this.backButtonListener) this.backButtonListener.remove();
+    if (this.tabTransitionTimer) clearTimeout(this.tabTransitionTimer);
     if (!this.systemThemeQuery) return;
     if (this.systemThemeQuery.removeEventListener) this.systemThemeQuery.removeEventListener("change", this.applyTheme);
     else this.systemThemeQuery.removeListener(this.applyTheme);
   },
   methods: {
+    playTabTransition() {
+      if (this.tabTransitionTimer) clearTimeout(this.tabTransitionTimer);
+      this.tabTransitioning = false;
+      this.$nextTick(() => {
+        requestAnimationFrame(() => {
+          this.tabTransitioning = true;
+          this.tabTransitionTimer = setTimeout(() => {
+            this.tabTransitioning = false;
+            this.tabTransitionTimer = null;
+          }, 240);
+        });
+      });
+    },
+    openTab(tab) {
+      if (this.activeTab === tab) return;
+      this.activeTab = tab;
+      this.tapFeedback();
+    },
+    returnToHome() {
+      if (this.activeTab === "schedule") return;
+      this.suppressTabTransition = true;
+      this.activeTab = "schedule";
+      this.tapFeedback();
+    },
     applyPredictiveBackFrame(progress = this._predictiveBackProgress, swipeEdge = this._predictiveBackEdge) {
       const safeProgress = Math.min(1, Math.max(0, Number(progress) || 0));
       const edgeDir = swipeEdge === 0 ? 1 : -1;
@@ -662,8 +698,7 @@ createApp({
         return;
       }
       if (this.activeTab !== "schedule") {
-        this.activeTab = "schedule";
-        this.tapFeedback();
+        this.returnToHome();
         return;
       }
       this.exitConfirmVisible = true;
@@ -716,6 +751,26 @@ createApp({
     },
     notify(message, type = "success") {
       ElementPlus.ElMessage({ message, type, duration: 2800, grouping: true });
+    },
+    async openFeedbackGroup() {
+      const groupNumber = "1075730072";
+      try {
+        if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(groupNumber);
+        else {
+          const input = document.createElement("textarea");
+          input.value = groupNumber;
+          input.style.position = "fixed";
+          input.style.opacity = "0";
+          document.body.appendChild(input);
+          input.select();
+          document.execCommand("copy");
+          input.remove();
+        }
+        this.notify("反馈群号已复制，正在打开 QQ");
+      } catch (_error) {
+        this.notify("反馈群：1075730072", "info");
+      }
+      window.location.href = "mqqapi://card/show_pslcard?src_type=internal&version=1&uin=1075730072&card_type=group&source=external";
     },
     nativeHttp() {
       const exports = window.capacitorExports;
@@ -845,6 +900,14 @@ createApp({
       }
     },
     async syncGradesFromSchool() {
+      const semesterLabel = this.gradeSemesterLabel(this.gradeForm.semester);
+      const cachedGrades = this.grades.filter(grade => this.gradeMatchesSemester(grade, this.gradeForm.semester));
+      if (cachedGrades.length) {
+        this.selectedGradeSemester = semesterLabel;
+        this.gradeSyncVisible = false;
+        this.notify(`已显示本地保存的 ${cachedGrades.length} 门成绩`);
+        return;
+      }
       if (!this.privacyConsent) {
         this.notify("请先阅读并同意隐私说明", "warning");
         this.privacyVisible = true;
@@ -868,7 +931,7 @@ createApp({
         this.gradeForm.password = "";
         this.selectedGradeSemester = this.gradeSemesterLabel(this.gradeForm.semester);
         this.gradeSyncVisible = false;
-        this.notify(`已保存 ${newGrades.length} 门课程的成绩`);
+        this.notify(`已保存 ${newGrades.length} 条成绩`);
       } catch (error) {
         const message = error.status === 401 ? error.message : `${error.message || "教务系统当前无法连接"}，已保存的成绩不受影响`;
         this.notify(message, "error");
@@ -893,32 +956,46 @@ createApp({
       };
     },
     async fetchSchoolGrades(startYear, term) {
-      const response = await this.httpRequest("POST", GRADE_URL, {
-        responseType: "json",
-        data: {
-          xnm: startYear,
-          xqm: term,
-          kcbj: "",
-          zd_fzdm: "N305005-xs",
-          page: "1",
-          rows: "200",
-          sidx: "",
-          sord: "asc",
-          _search: "false",
-          nd: String(Date.now())
-        },
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-          Accept: "application/json, text/javascript, */*; q=0.01",
-          Origin: SCHOOL_BASE,
-          Referer: GRADE_REFERER,
-          "X-Requested-With": "XMLHttpRequest"
-        }
-      });
-      const payload = responseData(response);
-      const rows = payload && (payload.items || payload.rows || payload.data || []);
-      if (!Array.isArray(rows)) throw new Error("教务系统返回了无法识别的成绩数据");
-      return rows;
+      const allRows = [];
+      let page = 1;
+      let total = null;
+      const seenPages = new Set();
+      while (page <= 30) {
+        const response = await this.httpRequest("POST", GRADE_URL, {
+          responseType: "json",
+          data: {
+            xnm: startYear,
+            xqm: term,
+            sfzgcj: "",
+            kcbj: "",
+            _search: "false",
+            nd: String(Date.now()),
+            "queryModel.showCount": "15",
+            "queryModel.currentPage": String(page),
+            "queryModel.sortName": " ",
+            "queryModel.sortOrder": "asc",
+            time: "1"
+          },
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            Accept: "application/json, text/javascript, */*; q=0.01",
+            Origin: SCHOOL_BASE,
+            Referer: GRADE_REFERER,
+            "X-Requested-With": "XMLHttpRequest"
+          }
+        });
+        const payload = responseData(response);
+        const rows = payload && (payload.items || payload.rows || payload.data || []);
+        if (!Array.isArray(rows)) throw new Error("教务系统返回了无法识别的成绩数据");
+        const pageSignature = rows.map(item => item.key || item.jxb_id || item.kch || JSON.stringify(item)).join("|");
+        if (pageSignature && seenPages.has(pageSignature)) break;
+        seenPages.add(pageSignature);
+        allRows.push(...rows);
+        total = Number(payload.records ?? payload.totalCount ?? payload.total) || total;
+        if (!rows.length || (total !== null && allRows.length >= total) || rows.length < 15) break;
+        page += 1;
+      }
+      return allRows;
     },
     normalizeSchoolGrade(item, index) {
       const semester = item.xnmmc && item.xqmmc ? `${item.xnmmc} 第${item.xqmmc}学期` : this.gradeSemesterLabel(this.gradeForm.semester);
@@ -960,10 +1037,41 @@ createApp({
       const option = this.semesterOptions.find(item => item.value === value);
       return option ? option.label : value;
     },
+    gradeSemesterRequest(value) {
+      const [startYear, _endYear, term] = String(value).split("-");
+      return { startYear, term: term === "1" ? "3" : "12" };
+    },
+    gradeMatchesSemester(grade, semesterValue) {
+      const expected = this.gradeSemesterRequest(semesterValue);
+      const remote = grade.remote || {};
+      if (String(remote.xnm || "") === expected.startYear && String(remote.xqm || "") === expected.term) return true;
+      return grade.semester === this.gradeSemesterLabel(semesterValue);
+    },
     replaceGradesForSemester(semesterValue, grades) {
-      const label = this.gradeSemesterLabel(semesterValue);
-      this.grades = [...this.grades.filter(grade => grade.semester !== label), ...grades];
+      this.grades = [...this.grades.filter(grade => !this.gradeMatchesSemester(grade, semesterValue)), ...grades];
       this.persistGrades();
+    },
+    deleteGradesForSemester() {
+      if (this.selectedGradeSemester === "全部") {
+        this.notify("请先选择要删除的学期", "warning");
+        return;
+      }
+      const semester = this.selectedGradeSemester;
+      const semesterOption = this.semesterOptions.find(option => option.label === semester);
+      const matchesSemester = grade => semesterOption
+        ? this.gradeMatchesSemester(grade, semesterOption.value)
+        : grade.semester === semester;
+      const count = this.grades.filter(matchesSemester).length;
+      if (!count) return;
+      if (!window.confirm(`确定删除“${semester}”的全部 ${count} 门成绩吗？删除后可重新查询该学期。`)) return;
+      this.grades = this.grades.filter(grade => !matchesSemester(grade));
+      this.gradeHistory = this.gradeHistory.filter(record => semesterOption
+        ? record.semester !== semesterOption.value
+        : this.gradeSemesterLabel(record.semester) !== semester);
+      this.persistGrades();
+      localStorage.setItem(STORAGE.gradeHistory, JSON.stringify(this.gradeHistory));
+      this.selectedGradeSemester = "全部";
+      this.notify("该学期成绩已删除，可重新查询");
     },
     saveGradeSnapshot(semester, grades) {
       this.gradeHistory.unshift({
@@ -980,26 +1088,32 @@ createApp({
       this.activeGrade = grade;
       this.gradeDetailVisible = true;
       this.tapFeedback();
-      if (grade.detailFetched || !grade.remote || !grade.remote.jxbId) return;
+      if ((grade.detailFetched && grade.components?.length) || !grade.remote || !grade.remote.jxbId) return;
       this.gradeDetailLoading = true;
       try {
-        const query = new URLSearchParams({
+        const detailData = {
           jxb_id: grade.remote.jxbId,
           xnm: grade.remote.xnm,
           xqm: grade.remote.xqm,
-          kcmc: grade.remote.kcmc,
-          ...(grade.remote.xhId ? { xh_id: grade.remote.xhId } : {})
-        });
-        const response = await this.httpRequest("GET", `${GRADE_DETAIL_URL}?${query.toString()}`, {
+          kcmc: grade.remote.kcmc
+        };
+        if (grade.remote.xhId) detailData.xh_id = grade.remote.xhId;
+        const response = await this.httpRequest("POST", `${GRADE_DETAIL_URL}?time=${Date.now()}&gnmkdm=N305005`, {
           responseType: "text",
-          headers: { Referer: GRADE_REFERER }
+          data: detailData,
+          headers: {
+            Referer: GRADE_DETAIL_REFERER,
+            Origin: "http://jw.whcibe.com",
+            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+            "X-Requested-With": "XMLHttpRequest"
+          }
         });
         const components = this.parseGradeDetailHtml(htmlText(response));
         if (components.length) grade.components = components;
-        grade.detailFetched = true;
+        grade.detailFetched = components.length > 0;
         this.persistGrades();
-      } catch (_error) {
-        this.notify("该课程暂未开放分项成绩，已保留总评和教师信息", "info");
+      } catch (error) {
+        this.notify(`分项成绩读取失败：${error.status || error.message || "教务系统未返回详情"}`, "warning");
       } finally {
         this.gradeDetailLoading = false;
       }
@@ -1010,6 +1124,15 @@ createApp({
       const seen = new Set();
       documentNode.querySelectorAll("tr").forEach(row => {
         const cells = [...row.querySelectorAll("th, td")].map(cell => cell.textContent.replace(/\s+/g, " ").trim()).filter(Boolean);
+        if (cells.length >= 3) {
+          const label = cells[0].replace(/[【】\[\]：:]/g, "").trim();
+          if (/(平时|期中|期末|实验|作业|课堂|总评|考试)/.test(label) && cells[2] && !seen.has(label)) {
+            const weight = cells[1].match(/\d+(?:\.\d+)?\s*%/)?.[0] || "";
+            components.push({ label, value: cells[2], weight });
+            seen.add(label);
+            return;
+          }
+        }
         for (let index = 0; index + 1 < cells.length; index += 2) {
           const label = cells[index].replace(/[：:]/g, "");
           const value = cells[index + 1];

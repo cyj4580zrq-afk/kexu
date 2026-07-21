@@ -14,6 +14,7 @@
       class="app-shell"
       :class="[
         { bouncing: pullOffset > 0 },
+        { 'tab-entering': tabTransitioning },
         predictiveBackActive && predictiveBackTarget === 'secondary' ? 'pb-target-secondary' : '',
         predictiveBackActive && predictiveBackTarget === 'home' ? 'pb-target-home' : ''
       ]"
@@ -28,7 +29,7 @@
             <p class="home-date">{{ dateText }}</p>
             <h1>{{ greeting }}</h1>
           </div>
-          <button class="avatar-button" type="button" aria-label="打开设置" @click="activeTab = 'settings'">课</button>
+          <button class="avatar-button" type="button" aria-label="打开设置" @click="openTab('settings')">课</button>
         </header>
 
         <div class="home-week-row">
@@ -83,7 +84,7 @@
 
       <section v-show="activeTab === 'allCourses'" class="page schedule-page secondary-page">
         <header class="topbar">
-          <button class="back-button" type="button" aria-label="返回首页" @click="activeTab = 'schedule'">
+          <button class="back-button" type="button" aria-label="返回首页" @click="returnToHome()">
             <app-icon name="ChevronLeft" :size="22"></app-icon>
           </button>
           <div class="secondary-title"><h1>全部课表</h1><p>第 {{ selectedWeek }} 周</p></div>
@@ -289,7 +290,10 @@
             <p class="brand-line">ACADEMIC</p>
             <h1>成绩</h1>
           </div>
-          <button class="icon-button" type="button" aria-label="查询并保存成绩" @click="gradeSyncVisible = true"><app-icon name="Download" :size="20"></app-icon></button>
+          <div class="header-actions">
+            <button v-if="selectedGradeSemester !== '全部'" class="icon-button grade-delete-button" type="button" aria-label="删除当前学期成绩" @click="deleteGradesForSemester"><app-icon name="Trash2" :size="19"></app-icon></button>
+            <button class="icon-button" type="button" aria-label="查询并保存成绩" @click="gradeSyncVisible = true"><app-icon name="Download" :size="20"></app-icon></button>
+          </div>
         </header>
 
         <section class="grade-overview">
@@ -347,7 +351,7 @@
           <span class="empty-icon"><app-icon name="History" :size="30"></app-icon></span>
           <h2>还没有同步记录</h2>
           <p>每次成功同步后，这里会保留一份课表</p>
-          <button class="secondary-button compact" type="button" @click="activeTab = 'sync'">去同步</button>
+          <button class="secondary-button compact" type="button" @click="openTab('sync')">去同步</button>
         </div>
       </section>
 
@@ -416,7 +420,7 @@
           </div>
           <div class="setting-row">
             <span class="setting-icon cyan"><app-icon name="Droplets" :size="19"></app-icon></span>
-            <span><strong>液态玻璃</strong><small>为抽屉和控件加入通透质感</small></span>
+            <span><strong>全局液态玻璃</strong><small>为所有模块和按钮应用玻璃材质</small></span>
             <label class="switch"><input v-model="liquidGlassEnabled" type="checkbox"><span></span></label>
           </div>
           <div class="setting-row">
@@ -466,6 +470,11 @@
 
         <div class="settings-group">
           <h2>关于</h2>
+          <button type="button" class="setting-row" @click="openFeedbackGroup">
+            <span class="setting-icon blue"><app-icon name="MessageCircle" :size="19"></app-icon></span>
+            <span><strong>用户反馈</strong><small>QQ群：1075730072</small></span>
+            <app-icon name="ChevronRight" :size="18"></app-icon>
+          </button>
           <button type="button" class="setting-row" @click="privacyVisible = true">
             <span class="setting-icon green"><app-icon name="ShieldCheck" :size="19"></app-icon></span>
             <span><strong>隐私与非官方说明</strong><small>查看数据处理方式与使用边界</small></span>
@@ -473,12 +482,12 @@
           </button>
         </div>
 
-        <p class="version-text">课序 0.7.4</p>
+        <p class="version-text">课序 0.9.2 Stable</p>
       </section>
     </main>
 
     <nav v-if="activeTab !== 'allCourses'" class="bottom-nav" aria-label="应用导航">
-      <button v-for="tab in tabs" :key="tab.value" type="button" :class="{ active: activeTab === tab.value }" @click="activeTab = tab.value">
+      <button v-for="tab in tabs" :key="tab.value" type="button" :class="{ active: activeTab === tab.value }" @click="openTab(tab.value)">
         <app-icon :name="tab.icon" :size="activeTab === tab.value ? 22 : 20"></app-icon>
         <span>{{ tab.label }}</span>
       </button>

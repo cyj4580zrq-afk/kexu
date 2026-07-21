@@ -72,6 +72,8 @@ button, select { -webkit-tap-highlight-color: transparent; }
 .app-shell { width: 100%; max-width: 680px; min-height: 100vh; margin: 0 auto; transition: transform .52s cubic-bezier(.22, 1.45, .36, 1); will-change: transform; }
 .app-shell.bouncing { transition: none; }
 .page { min-height: 100vh; padding: calc(var(--safe-top) + 18px) 16px calc(106px + var(--safe-bottom)); }
+.app-shell.tab-entering .page { animation: tab-open .24s cubic-bezier(.22,.8,.35,1) both; }
+@keyframes tab-open { from { opacity: .72; transform: translate3d(0, 12px, 0) scale(.992); } to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); } }
 .standard-page { padding-left: 20px; padding-right: 20px; }
 @keyframes page-enter { from { opacity: 0; transform: translateY(8px); } }
 
@@ -383,6 +385,7 @@ body.dark .focus-topline em { background: rgba(0,0,0,.07); }
 .grade-filter::-webkit-scrollbar { display: none; }
 .grade-filter button { height: 32px; flex: none; padding: 0 12px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--muted); font-size: 11px; font-weight: 700; }
 .grade-filter button.active { border-color: var(--blue); background: var(--blue); color: #fff; }
+.grade-delete-button { color: var(--red); }
 .grade-list { display: grid; gap: 9px; }
 .grade-row { display: grid; grid-template-columns: 48px minmax(0,1fr) 18px; min-height: 80px; align-items: center; gap: 12px; padding: 11px 12px; text-align: left; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); box-shadow: 0 3px 12px rgba(31,45,68,.04); }
 .grade-score { display: grid; width: 46px; height: 46px; place-items: center; border-radius: 8px; background: var(--surface-muted); color: var(--text); font-size: 17px; font-weight: 800; }
@@ -588,6 +591,127 @@ body.liquid-glass .icon-button {
 body.liquid-glass { --bg: #e8f0fa; }
 body.dark.liquid-glass { --bg: #111a28; }
 
+/* Global glass mode: all app surfaces share one translucent material system. */
+body.liquid-glass {
+  --global-glass-panel: rgba(255, 255, 255, .52);
+  --global-glass-control: rgba(255, 255, 255, .38);
+  --global-glass-line: rgba(255, 255, 255, .78);
+  --global-glass-shadow: 0 12px 28px rgba(54, 82, 122, .11), inset 0 1px 0 rgba(255, 255, 255, .52);
+}
+
+body.dark.liquid-glass {
+  --global-glass-panel: rgba(27, 35, 48, .56);
+  --global-glass-control: rgba(31, 40, 54, .42);
+  --global-glass-line: rgba(255, 255, 255, .13);
+  --global-glass-shadow: 0 12px 28px rgba(0, 0, 0, .28), inset 0 1px 0 rgba(255, 255, 255, .08);
+}
+
+body.liquid-glass .today-list,
+body.liquid-glass .all-schedule-button,
+body.liquid-glass .back-button,
+body.liquid-glass .week-arrow,
+body.liquid-glass .week-display,
+body.liquid-glass .day-button,
+body.liquid-glass .course-row,
+body.liquid-glass .timetable-grid,
+body.liquid-glass .grade-overview,
+body.liquid-glass .grade-row,
+body.liquid-glass .history-list,
+body.liquid-glass .history-row,
+body.liquid-glass .setting-row,
+body.liquid-glass .input-shell,
+body.liquid-glass .secondary-button,
+body.liquid-glass .period-stepper,
+body.liquid-glass .mini-segment,
+body.liquid-glass .bottom-sheet,
+body.liquid-glass .exit-dialog,
+body.liquid-glass .semester-option,
+body.liquid-glass .detail-title,
+body.liquid-glass .grade-detail-total,
+body.liquid-glass .grade-teacher-detail,
+body.liquid-glass .grade-components,
+body.liquid-glass .fallback-import textarea,
+body.liquid-glass .bottom-nav {
+  border-color: var(--global-glass-line);
+  background: var(--global-glass-panel);
+  box-shadow: var(--global-glass-shadow);
+  -webkit-backdrop-filter: blur(18px) saturate(155%);
+  backdrop-filter: blur(18px) saturate(155%);
+}
+
+body.liquid-glass .timetable-corner,
+body.liquid-glass .timetable-day-head,
+body.liquid-glass .timetable-time,
+body.liquid-glass .grade-overview > div,
+body.liquid-glass .grade-components > div,
+body.liquid-glass .today-list > button,
+body.liquid-glass .history-row,
+body.liquid-glass .detail-list > div {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--global-glass-line) 72%, var(--line));
+}
+
+body.liquid-glass .timetable-course {
+  background: color-mix(in srgb, var(--course-bg) 68%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .32);
+  -webkit-backdrop-filter: blur(12px) saturate(145%);
+  backdrop-filter: blur(12px) saturate(145%);
+}
+
+body.liquid-glass .course-row.finished { background: color-mix(in srgb, var(--red-soft) 66%, transparent); }
+body.liquid-glass .grade-score,
+body.liquid-glass .setting-icon,
+body.liquid-glass .history-icon,
+body.liquid-glass .sync-mark,
+body.liquid-glass .empty-icon,
+body.liquid-glass .semester-number,
+body.liquid-glass .grade-detail-meta span {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .34);
+  -webkit-backdrop-filter: blur(12px) saturate(145%);
+  backdrop-filter: blur(12px) saturate(145%);
+}
+
+body.liquid-glass .avatar-button,
+body.liquid-glass .icon-button,
+body.liquid-glass .bottom-sheet header button,
+body.liquid-glass .week-grid button,
+body.liquid-glass .grade-filter button,
+body.liquid-glass .restore-button,
+body.liquid-glass .primary-button,
+body.liquid-glass .danger-button,
+body.liquid-glass .fab,
+body.liquid-glass .focus-footer button {
+  border: 1px solid var(--global-glass-line);
+  box-shadow: var(--global-glass-shadow);
+  -webkit-backdrop-filter: blur(16px) saturate(155%);
+  backdrop-filter: blur(16px) saturate(155%);
+}
+
+body.liquid-glass .icon-button,
+body.liquid-glass .bottom-sheet header button,
+body.liquid-glass .week-grid button,
+body.liquid-glass .grade-filter button,
+body.liquid-glass .restore-button {
+  background: var(--global-glass-control);
+}
+
+body.liquid-glass .primary-button,
+body.liquid-glass .fab,
+body.liquid-glass .focus-footer button {
+  background: color-mix(in srgb, var(--blue) 72%, transparent);
+}
+
+body.liquid-glass .danger-button { background: color-mix(in srgb, var(--red) 55%, transparent); color: #fff; }
+body.liquid-glass .grade-filter button.active,
+body.liquid-glass .week-grid button.active,
+body.liquid-glass .day-button.active { background: color-mix(in srgb, var(--blue) 78%, transparent); }
+body.liquid-glass .mini-segment button.active { background: rgba(255, 255, 255, .58); }
+body.dark.liquid-glass .mini-segment button.active { background: rgba(255, 255, 255, .12); }
+body.liquid-glass .focus-panel { border: 1px solid rgba(255, 255, 255, .18); background: rgba(19, 31, 52, .70); box-shadow: 0 18px 42px rgba(22, 42, 78, .22), inset 0 1px 0 rgba(255, 255, 255, .15); -webkit-backdrop-filter: blur(22px) saturate(150%); backdrop-filter: blur(22px) saturate(150%); }
+body.dark.liquid-glass .focus-panel { background: rgba(225, 236, 250, .74); }
+body.liquid-glass .bottom-nav { background: var(--global-glass-control); }
+body.liquid-glass.nav-clear-glass .bottom-nav { background: transparent; }
+
 body.nav-glass .bottom-nav {
   border: 1px solid var(--glass-line);
   background: var(--glass);
@@ -717,6 +841,25 @@ body.pb-cancelling .dialog-overlay.pb-target .exit-dialog {
   box-shadow: 0 16px 48px rgba(0, 0, 0, var(--pb-secondary-shadow));
   background: var(--bg);
   will-change: transform, border-radius, box-shadow;
+}
+
+/* Keep predictive back compositor-only. Dynamic blur, radius and shadow rasterization drop frames on long pages. */
+.pb-active .app-shell.pb-target-secondary .page:not(.home-page) {
+  border-radius: 20px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, .18);
+  will-change: transform, opacity;
+}
+
+.pb-active .app-shell.pb-target-home {
+  border-radius: 18px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .16);
+  will-change: transform, opacity;
+}
+
+body.pb-active.liquid-glass .app-shell.pb-target-secondary .page:not(.home-page) *,
+body.pb-active.liquid-glass .app-shell.pb-target-home * {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }
 
 .pb-committing .app-shell.pb-target-secondary .page:not(.home-page) {
