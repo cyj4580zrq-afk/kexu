@@ -736,12 +736,13 @@ createApp({
           window.KexuUpdater.checkForUpdate();
           return;
         }
-        const response = await fetch("https://api.github.com/repos/cyj4580zrq-afk/kexu/releases/latest", {
+        const response = await fetch("https://api.github.com/repos/cyj4580zrq-afk/kexu/releases?per_page=20", {
           headers: { Accept: "application/vnd.github+json" }
         });
         if (!response.ok) throw new Error(`更新服务返回 ${response.status}`);
-        const release = await response.json();
-        const asset = (release.assets || []).find(item => String(item.name).endsWith(".apk"));
+        const releases = await response.json();
+        const release = (releases || []).find(item => (item.assets || []).some(asset => String(asset.name).endsWith(".apk")));
+        const asset = (release?.assets || []).find(item => String(item.name).endsWith(".apk"));
         this.handleUpdateEvent(asset ? {
           type: "release",
           version: release.tag_name,

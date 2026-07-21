@@ -193,7 +193,7 @@ public class MainActivity extends BridgeActivity {
             HttpURLConnection connection = null;
             try {
                 connection = (HttpURLConnection) new URL(
-                    "https://api.github.com/repos/cyj4580zrq-afk/kexu/releases/latest"
+                    "https://api.github.com/repos/cyj4580zrq-afk/kexu/releases?per_page=20"
                 ).openConnection();
                 connection.setConnectTimeout(10000);
                 connection.setReadTimeout(15000);
@@ -207,13 +207,17 @@ public class MainActivity extends BridgeActivity {
                     String line;
                     while ((line = reader.readLine()) != null) body.append(line);
                 }
-                JSONObject release = new JSONObject(body.toString());
-                JSONArray assets = release.optJSONArray("assets");
+                JSONArray releases = new JSONArray(body.toString());
+                JSONObject release = null;
                 JSONObject apk = null;
-                if (assets != null) {
-                    for (int index = 0; index < assets.length(); index++) {
-                        JSONObject candidate = assets.optJSONObject(index);
+                for (int releaseIndex = 0; releaseIndex < releases.length() && apk == null; releaseIndex++) {
+                    JSONObject candidateRelease = releases.optJSONObject(releaseIndex);
+                    JSONArray assets = candidateRelease == null ? null : candidateRelease.optJSONArray("assets");
+                    if (assets == null) continue;
+                    for (int assetIndex = 0; assetIndex < assets.length(); assetIndex++) {
+                        JSONObject candidate = assets.optJSONObject(assetIndex);
                         if (candidate != null && candidate.optString("name").endsWith(".apk")) {
+                            release = candidateRelease;
                             apk = candidate;
                             break;
                         }
