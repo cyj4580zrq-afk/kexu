@@ -1,8 +1,8 @@
 {
   "name": "kexu-mobile",
-  "version": "0.5.3",
+  "version": "0.7.4",
   "private": true,
-  "description": "课序 Android 与 iOS 课程表",
+  "description": "课序 Android 课程表",
   "scripts": {
     "sync": "cap sync && node scripts/fix-ios-package-paths.mjs",
     "sync:android": "cap sync android",

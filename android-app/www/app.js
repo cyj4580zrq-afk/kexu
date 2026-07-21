@@ -22,6 +22,10 @@ const STORAGE = {
   showWeekends: "campusflow-show-weekends",
   compactCards: "campusflow-compact-cards",
   bounceEnabled: "campusflow-bounce-enabled",
+  predictiveBackEnabled: "campusflow-predictive-back-enabled",
+  liquidGlassEnabled: "campusflow-liquid-glass-enabled",
+  bottomNavGlassEnabled: "campusflow-bottom-nav-glass-enabled",
+  bottomNavClearGlassEnabled: "campusflow-bottom-nav-clear-glass-enabled",
   hapticsEnabled: "campusflow-haptics-enabled",
   scheduleView: "campusflow-schedule-view",
   periodDuration: "campusflow-period-duration",
@@ -202,6 +206,7 @@ createApp({
       weekSheetVisible: false,
       weekSheetMode: "view",
       semesterSheetVisible: false,
+      semesterSheetTarget: "course",
       privacyVisible: false,
       detailVisible: false,
       gradeDetailVisible: false,
@@ -213,6 +218,7 @@ createApp({
       grades: readJson(STORAGE.grades, []),
       gradeHistory: readJson(STORAGE.gradeHistory, []),
       selectedGradeSemester: "全部",
+      gradeSyncVisible: false,
       gradeDetailLoading: false,
       themeMode: localStorage.getItem(STORAGE.themeMode) || (localStorage.getItem(STORAGE.theme) === "dark" ? "dark" : "system"),
       accentOptions: ["#2577f5", "#7857e8", "#16a085", "#ee6b4d"],
@@ -220,7 +226,11 @@ createApp({
       homeScope: localStorage.getItem(STORAGE.homeScope) || "today",
       showWeekends: localStorage.getItem(STORAGE.showWeekends) !== "false",
       compactCards: localStorage.getItem(STORAGE.compactCards) === "true",
-      bounceEnabled: localStorage.getItem(STORAGE.bounceEnabled) !== "false",
+      bounceEnabled: localStorage.getItem(STORAGE.bounceEnabled) === "true",
+      predictiveBackEnabled: localStorage.getItem(STORAGE.predictiveBackEnabled) === "true",
+      liquidGlassEnabled: localStorage.getItem(STORAGE.liquidGlassEnabled) === "true",
+      bottomNavGlassEnabled: localStorage.getItem(STORAGE.bottomNavGlassEnabled) === "true",
+      bottomNavClearGlassEnabled: localStorage.getItem(STORAGE.bottomNavClearGlassEnabled) === "true",
       hapticsEnabled: localStorage.getItem(STORAGE.hapticsEnabled) !== "false",
       scheduleView: localStorage.getItem(STORAGE.scheduleView) || "grid",
       periodDuration: Math.min(60, Math.max(30, Number(localStorage.getItem(STORAGE.periodDuration)) || DEFAULT_PERIOD_DURATION)),
@@ -231,10 +241,24 @@ createApp({
       backButtonListener: null,
       showPassword: false,
       privacyConsent: localStorage.getItem(STORAGE.privacyConsent) === "true",
+      predictiveBackActive: false,
+      predictiveBackCancelling: false,
+      predictiveBackCommitting: false,
+      predictiveBackReturned: false,
+      predictiveBackTarget: null,
+      predictiveBackKey: null,
+      predictiveBackTimer: null,
       syncLoading: false,
       syncStep: "正在连接教务系统",
+      gradeLoading: false,
+      gradeStep: "正在连接教务系统",
       schoolStatus: { type: "unknown", text: "等待连接" },
       syncForm: {
+        username: localStorage.getItem(STORAGE.username) || "",
+        password: "",
+        semester
+      },
+      gradeForm: {
         username: localStorage.getItem(STORAGE.username) || "",
         password: "",
         semester
@@ -369,6 +393,10 @@ createApp({
       const selected = this.semesterOptions.find(option => option.value === this.syncForm.semester);
       return selected ? selected.label : "请选择学期";
     },
+    selectedGradeSemesterLabel() {
+      const selected = this.semesterOptions.find(option => option.value === this.gradeForm.semester);
+      return selected ? selected.label : "请选择学期";
+    },
     lastSyncText() {
       if (!this.syncHistory.length) return "尚未同步过课表";
       return `上次同步：${this.formatDate(this.syncHistory[0].syncedAt)}`;
@@ -406,6 +434,21 @@ createApp({
       localStorage.setItem(STORAGE.compactCards, String(value));
     },
     bounceEnabled(value) { localStorage.setItem(STORAGE.bounceEnabled, String(value)); },
+    predictiveBackEnabled(value) { localStorage.setItem(STORAGE.predictiveBackEnabled, String(value)); },
+    liquidGlassEnabled(value) {
+      this.applyLiquidGlass(value);
+      localStorage.setItem(STORAGE.liquidGlassEnabled, String(value));
+    },
+    bottomNavGlassEnabled(value) {
+      if (!value && this.bottomNavClearGlassEnabled) this.bottomNavClearGlassEnabled = false;
+      this.applyBottomNavGlass(value);
+      localStorage.setItem(STORAGE.bottomNavGlassEnabled, String(value));
+    },
+    bottomNavClearGlassEnabled(value) {
+      if (value && !this.bottomNavGlassEnabled) this.bottomNavGlassEnabled = true;
+      this.applyBottomNavClearGlass(value);
+      localStorage.setItem(STORAGE.bottomNavClearGlassEnabled, String(value));
+    },
     hapticsEnabled(value) { localStorage.setItem(STORAGE.hapticsEnabled, String(value)); },
     scheduleView(value) { localStorage.setItem(STORAGE.scheduleView, value); },
     periodDuration(value) { localStorage.setItem(STORAGE.periodDuration, String(value)); },
@@ -415,26 +458,175 @@ createApp({
     }
   },
   mounted() {
+    this._predictiveBackProgress = 0;
+    this._predictiveBackEdge = 0;
+    this._predictiveBackWidth = window.innerWidth;
+    this._predictiveBackLastFrame = "";
     this.applyTheme();
     this.applyAccent(this.accentColor);
+    this.applyLiquidGlass(this.liquidGlassEnabled);
+    this.applyBottomNavGlass(this.bottomNavGlassEnabled);
+    this.applyBottomNavClearGlass(this.bottomNavClearGlassEnabled);
     document.body.classList.toggle("compact-cards", this.compactCards);
     this.systemThemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
     if (this.systemThemeQuery.addEventListener) this.systemThemeQuery.addEventListener("change", this.applyTheme);
     else this.systemThemeQuery.addListener(this.applyTheme);
+    window.onPredictiveBackEvent = (action, progress, swipeEdge) => {
+      this.handlePredictiveBackEvent(action, progress, swipeEdge);
+    };
+    this.syncPredictiveBackVisualState();
     this.setupNativeBackButton();
     this.checkSchoolStatus();
   },
   beforeUnmount() {
+    window.onPredictiveBackEvent = null;
+    document.body.classList.remove("pb-active", "pb-cancelling", "pb-committing", "pb-returned", "liquid-glass", "nav-glass", "nav-clear-glass");
     if (this.backButtonListener) this.backButtonListener.remove();
     if (!this.systemThemeQuery) return;
     if (this.systemThemeQuery.removeEventListener) this.systemThemeQuery.removeEventListener("change", this.applyTheme);
     else this.systemThemeQuery.removeListener(this.applyTheme);
   },
   methods: {
+    applyPredictiveBackFrame(progress = this._predictiveBackProgress, swipeEdge = this._predictiveBackEdge) {
+      const safeProgress = Math.min(1, Math.max(0, Number(progress) || 0));
+      const edgeDir = swipeEdge === 0 ? 1 : -1;
+      const width = this._predictiveBackWidth || window.innerWidth;
+      const frameKey = `${safeProgress.toFixed(4)}:${swipeEdge}:${width}`;
+      if (frameKey === this._predictiveBackLastFrame) return;
+
+      this._predictiveBackProgress = safeProgress;
+      this._predictiveBackEdge = swipeEdge;
+      this._predictiveBackLastFrame = frameKey;
+      const variables = {
+        "--pb-progress": safeProgress.toFixed(4),
+        "--pb-sheet-overlay": (0.46 * (1 - safeProgress * 0.6)).toFixed(3),
+        "--pb-dialog-overlay": (0.5 * (1 - safeProgress * 0.5)).toFixed(3),
+        "--pb-sheet-shift": `${(safeProgress * 16).toFixed(2)}px`,
+        "--pb-sheet-scale": (1 - safeProgress * 0.08).toFixed(4),
+        "--pb-sheet-top-radius": `${(16 + safeProgress * 12).toFixed(2)}px`,
+        "--pb-sheet-bottom-radius": `${(safeProgress * 20).toFixed(2)}px`,
+        "--pb-dialog-scale": (1 - safeProgress * 0.12).toFixed(4),
+        "--pb-dialog-shift": `${(safeProgress * 8).toFixed(2)}px`,
+        "--pb-dialog-opacity": (1 - safeProgress * 0.35).toFixed(3),
+        "--pb-secondary-scale": (1 - safeProgress * 0.07).toFixed(4),
+        "--pb-secondary-shift": `${(edgeDir * safeProgress * Math.min(112, width * 0.28)).toFixed(2)}px`,
+        "--pb-secondary-commit-shift": `${edgeDir * (width + 40)}px`,
+        "--pb-secondary-radius": `${(safeProgress * 24).toFixed(2)}px`,
+        "--pb-secondary-shadow": (safeProgress * 0.25).toFixed(3),
+        "--pb-preview-scale": (0.93 + safeProgress * 0.07).toFixed(4),
+        "--pb-preview-opacity": (0.5 + safeProgress * 0.5).toFixed(3),
+        "--pb-preview-radius": `${((1 - safeProgress) * 20).toFixed(2)}px`,
+        "--pb-home-scale": (1 - safeProgress * 0.06).toFixed(4),
+        "--pb-home-shift": `${(edgeDir * safeProgress * 16).toFixed(2)}px`,
+        "--pb-home-radius": `${(safeProgress * 22).toFixed(2)}px`,
+        "--pb-home-shadow": (safeProgress * 0.2).toFixed(3)
+      };
+      Object.entries(variables).forEach(([key, value]) => document.documentElement.style.setProperty(key, value));
+    },
+    syncPredictiveBackVisualState() {
+      this.applyPredictiveBackFrame();
+      document.body.classList.toggle("pb-active", this.predictiveBackActive);
+      document.body.classList.toggle("pb-cancelling", this.predictiveBackCancelling);
+      document.body.classList.toggle("pb-committing", this.predictiveBackCommitting);
+      document.body.classList.toggle("pb-returned", this.predictiveBackReturned);
+    },
+    getTopPredictiveTarget() {
+      if (this.exitConfirmVisible) return { type: "dialog", key: "exitDialog" };
+      if (this.semesterSheetVisible) return { type: "sheet", key: "semesterSheet" };
+      if (this.detailVisible) return { type: "sheet", key: "detailSheet" };
+      if (this.gradeDetailVisible) return { type: "sheet", key: "gradeDetailSheet" };
+      if (this.privacyVisible) return { type: "sheet", key: "privacySheet" };
+      if (this.addVisible) return { type: "sheet", key: "addSheet" };
+      if (this.gradeSyncVisible) return { type: "sheet", key: "gradeSyncSheet" };
+      if (this.weekSheetVisible) return { type: "sheet", key: "weekSheet" };
+      if (this.activeTab !== "schedule") return { type: "secondary", key: "secondaryPage" };
+      return { type: "home", key: "homePage" };
+    },
+    handlePredictiveBackEvent(action, progress = 0, swipeEdge = 0) {
+      if (!this.predictiveBackEnabled) {
+        if (action === "complete") this.handleBackButton();
+        return;
+      }
+      if (this.predictiveBackTimer) {
+        clearTimeout(this.predictiveBackTimer);
+        this.predictiveBackTimer = null;
+      }
+      if (action === "start") {
+        const target = this.getTopPredictiveTarget();
+        this.predictiveBackTarget = target.type;
+        this.predictiveBackKey = target.key;
+        this.predictiveBackActive = true;
+        this.predictiveBackCancelling = false;
+        this.predictiveBackCommitting = false;
+        this.predictiveBackReturned = false;
+        this._predictiveBackWidth = window.innerWidth;
+        this._predictiveBackLastFrame = "";
+        this.applyPredictiveBackFrame(progress, swipeEdge);
+        this.syncPredictiveBackVisualState();
+      } else if (action === "progress") {
+        if (!this.predictiveBackActive) {
+          const target = this.getTopPredictiveTarget();
+          this.predictiveBackTarget = target.type;
+          this.predictiveBackKey = target.key;
+          this.predictiveBackActive = true;
+          this.predictiveBackCommitting = false;
+          this.predictiveBackReturned = false;
+          this._predictiveBackWidth = window.innerWidth;
+          this._predictiveBackLastFrame = "";
+          this.syncPredictiveBackVisualState();
+        }
+        this.applyPredictiveBackFrame(progress, swipeEdge);
+      } else if (action === "cancel") {
+        this.predictiveBackCancelling = true;
+        this.applyPredictiveBackFrame(0, this._predictiveBackEdge);
+        this.syncPredictiveBackVisualState();
+        this.predictiveBackTimer = setTimeout(() => {
+          this.predictiveBackActive = false;
+          this.predictiveBackCancelling = false;
+          this.predictiveBackCommitting = false;
+          this.predictiveBackReturned = false;
+          this.predictiveBackTarget = null;
+          this.predictiveBackKey = null;
+          this.syncPredictiveBackVisualState();
+        }, 260);
+      } else if (action === "complete") {
+        this.applyPredictiveBackFrame(1, this._predictiveBackEdge);
+        this.predictiveBackCancelling = false;
+        this.predictiveBackCommitting = true;
+        this.syncPredictiveBackVisualState();
+        this.predictiveBackTimer = setTimeout(() => {
+          this.predictiveBackReturned = true;
+          this.handleBackButton();
+          // The persistent home page is already rendered under the outgoing page.
+          // Commit after Vue has switched tabs so there is no temporary preview to replace.
+          this.$nextTick(() => {
+            requestAnimationFrame(() => {
+              this.predictiveBackActive = false;
+              this.predictiveBackCancelling = false;
+              this.predictiveBackCommitting = false;
+              this.predictiveBackTarget = null;
+              this.predictiveBackKey = null;
+              this.applyPredictiveBackFrame(0, this._predictiveBackEdge);
+              this.syncPredictiveBackVisualState();
+              requestAnimationFrame(() => {
+                this.predictiveBackReturned = false;
+                this.syncPredictiveBackVisualState();
+              });
+            });
+          });
+        }, 210);
+      }
+    },
     async setupNativeBackButton() {
       if (!window.Capacitor || !window.Capacitor.isNativePlatform()) return;
       this.nativeApp = window.capacitorExports.registerPlugin("App");
-      this.backButtonListener = await this.nativeApp.addListener("backButton", this.handleBackButton);
+      this.backButtonListener = await this.nativeApp.addListener("backButton", () => {
+        // Android 13+ predictive back is owned by MainActivity. Letting Capacitor
+        // also process this event would replace the page before the gesture ends.
+        if (!this.predictiveBackEnabled && !this.predictiveBackActive) {
+          this.handleBackButton();
+        }
+      });
     },
     handleBackButton() {
       if (this.exitConfirmVisible) {
@@ -459,6 +651,10 @@ createApp({
       }
       if (this.semesterSheetVisible) {
         this.semesterSheetVisible = false;
+        return;
+      }
+      if (this.gradeSyncVisible) {
+        this.gradeSyncVisible = false;
         return;
       }
       if (this.weekSheetVisible) {
@@ -489,6 +685,15 @@ createApp({
       const green = parseInt(color.slice(3, 5), 16);
       const blue = parseInt(color.slice(5, 7), 16);
       document.documentElement.style.setProperty("--blue-soft", `rgba(${red}, ${green}, ${blue}, .12)`);
+    },
+    applyLiquidGlass(enabled) {
+      document.body.classList.toggle("liquid-glass", enabled);
+    },
+    applyBottomNavGlass(enabled) {
+      document.body.classList.toggle("nav-glass", enabled);
+    },
+    applyBottomNavClearGlass(enabled) {
+      document.body.classList.toggle("nav-clear-glass", enabled);
     },
     tapFeedback(duration = 10) {
       if (this.hapticsEnabled && navigator.vibrate) navigator.vibrate(duration);
@@ -545,6 +750,44 @@ createApp({
         this.schoolStatus = { type: "offline", text: "暂不可用" };
       }
     },
+    async authenticateSchool(credentials, setStep) {
+      const cookies = window.capacitorExports && window.capacitorExports.CapacitorCookies;
+      if (cookies) await cookies.clearAllCookies();
+
+      setStep("正在获取登录信息");
+      const loginPage = await this.httpRequest("GET", LOGIN_URL, {
+        headers: { "Accept-Language": "zh-CN,zh;q=0.9" }
+      });
+      const loginHtml = htmlText(loginPage);
+      const csrfMatch = loginHtml.match(/id=["']csrftoken["'][^>]*value=["']([^"']+)["']/i)
+        || loginHtml.match(/value=["']([^"']+)["'][^>]*id=["']csrftoken["']/i);
+      if (!csrfMatch) throw new Error("教务系统未返回登录令牌，可能正在维护");
+
+      const publicKeyResponse = await this.httpRequest("GET", PUBKEY_URL, {
+        params: { time: String(Date.now()) },
+        headers: { Referer: LOGIN_URL }
+      });
+      const publicKey = responseData(publicKeyResponse);
+      if (!publicKey || !publicKey.modulus || !publicKey.exponent) throw new Error("教务系统未返回密码加密公钥");
+
+      setStep("正在安全登录");
+      const encryptedPassword = encryptSchoolPassword(credentials.password, publicKey.modulus, publicKey.exponent);
+      const loginResponse = await this.httpRequest("POST", `${LOGIN_URL}?time=${Date.now()}`, {
+        data: { csrftoken: csrfMatch[1], yhm: credentials.username, mm: encryptedPassword },
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+          Origin: SCHOOL_BASE,
+          Referer: LOGIN_URL
+        }
+      });
+      const loginResultHtml = htmlText(loginResponse);
+      if (/id=["']csrftoken["']/i.test(loginResultHtml) || String(loginResponse.url || "").includes("login_slogin")) {
+        const tips = loginResultHtml.match(/id=["']tips["'][^>]*>([\s\S]*?)<\//i);
+        const error = new Error(tips ? tips[1].replace(/<[^>]+>/g, "").trim() : "账号或密码错误，或教务系统要求验证码");
+        error.status = 401;
+        throw error;
+      }
+    },
     async syncFromSchool() {
       if (!this.privacyConsent) {
         this.notify("请先阅读并同意隐私说明", "warning");
@@ -558,53 +801,7 @@ createApp({
       this.syncLoading = true;
       this.schoolStatus = { type: "unknown", text: "连接中" };
       try {
-        const cookies = window.capacitorExports && window.capacitorExports.CapacitorCookies;
-        if (cookies) await cookies.clearAllCookies();
-
-        this.syncStep = "正在获取登录信息";
-        const loginPage = await this.httpRequest("GET", LOGIN_URL, {
-          headers: { "Accept-Language": "zh-CN,zh;q=0.9" }
-        });
-        const loginHtml = htmlText(loginPage);
-        const csrfMatch = loginHtml.match(/id=["']csrftoken["'][^>]*value=["']([^"']+)["']/i)
-          || loginHtml.match(/value=["']([^"']+)["'][^>]*id=["']csrftoken["']/i);
-        if (!csrfMatch) throw new Error("教务系统未返回登录令牌，可能正在维护");
-
-        const publicKeyResponse = await this.httpRequest("GET", PUBKEY_URL, {
-          params: { time: String(Date.now()) },
-          headers: { Referer: LOGIN_URL }
-        });
-        const publicKey = responseData(publicKeyResponse);
-        if (!publicKey || !publicKey.modulus || !publicKey.exponent) {
-          throw new Error("教务系统未返回密码加密公钥");
-        }
-
-        this.syncStep = "正在安全登录";
-        const encryptedPassword = encryptSchoolPassword(
-          this.syncForm.password,
-          publicKey.modulus,
-          publicKey.exponent
-        );
-        const loginResponse = await this.httpRequest("POST", `${LOGIN_URL}?time=${Date.now()}`, {
-          data: {
-            csrftoken: csrfMatch[1],
-            yhm: this.syncForm.username,
-            mm: encryptedPassword
-          },
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-            Origin: SCHOOL_BASE,
-            Referer: LOGIN_URL
-          }
-        });
-        const loginResultHtml = htmlText(loginResponse);
-        if (/id=["']csrftoken["']/i.test(loginResultHtml) || String(loginResponse.url || "").includes("login_slogin")) {
-          const tips = loginResultHtml.match(/id=["']tips["'][^>]*>([\s\S]*?)<\//i);
-          const detail = tips ? tips[1].replace(/<[^>]+>/g, "").trim() : "账号或密码错误，或教务系统要求验证码";
-          const error = new Error(detail);
-          error.status = 401;
-          throw error;
-        }
+        await this.authenticateSchool(this.syncForm, step => { this.syncStep = step; });
 
         this.syncStep = "正在获取课程";
         const [startYear, _endYear, term] = this.syncForm.semester.split("-");
@@ -629,25 +826,12 @@ createApp({
           this.saveSnapshot("教务系统直接同步", this.syncForm.semester, newCourses);
         }
 
-        let gradeMessage = "";
-        try {
-          this.syncStep = "正在获取成绩";
-          const rawGrades = await this.fetchSchoolGrades(startYear, term === "1" ? "3" : "12");
-          const newGrades = rawGrades.map((grade, index) => this.normalizeSchoolGrade(grade, index));
-          this.grades = newGrades;
-          this.persistGrades();
-          this.saveGradeSnapshot(this.syncForm.semester, newGrades);
-          gradeMessage = `，${newGrades.length} 门成绩`;
-        } catch (gradeError) {
-          gradeMessage = "，成绩暂未同步";
-          console.warn("Grade synchronization failed", gradeError);
-        }
         localStorage.setItem(STORAGE.username, this.syncForm.username);
         localStorage.setItem(STORAGE.semester, this.syncForm.semester);
         this.syncForm.password = "";
         this.selectedDay = "全部";
         this.schoolStatus = { type: "online", text: "同步成功" };
-        this.notify(`已同步 ${newCourses.length} 门课程${gradeMessage}`);
+        this.notify(`已同步 ${newCourses.length} 门课程`);
         this.activeTab = "schedule";
       } catch (error) {
         this.schoolStatus = { type: "offline", text: error.status === 401 ? "登录失败" : "连接失败" };
@@ -658,6 +842,39 @@ createApp({
       } finally {
         this.syncLoading = false;
         this.syncStep = "正在连接教务系统";
+      }
+    },
+    async syncGradesFromSchool() {
+      if (!this.privacyConsent) {
+        this.notify("请先阅读并同意隐私说明", "warning");
+        this.privacyVisible = true;
+        return;
+      }
+      if (!this.gradeForm.username || !this.gradeForm.password) {
+        this.notify("请填写学号和密码", "warning");
+        return;
+      }
+      this.gradeLoading = true;
+      try {
+        await this.authenticateSchool(this.gradeForm, step => { this.gradeStep = step; });
+        this.gradeStep = "正在查询成绩";
+        const [startYear, _endYear, term] = this.gradeForm.semester.split("-");
+        const rawGrades = await this.fetchSchoolGrades(startYear, term === "1" ? "3" : "12");
+        const newGrades = rawGrades.map((grade, index) => this.normalizeSchoolGrade(grade, index));
+        this.replaceGradesForSemester(this.gradeForm.semester, newGrades);
+        this.saveGradeSnapshot(this.gradeForm.semester, newGrades);
+        localStorage.setItem(STORAGE.username, this.gradeForm.username);
+        localStorage.setItem(STORAGE.semester, this.gradeForm.semester);
+        this.gradeForm.password = "";
+        this.selectedGradeSemester = this.gradeSemesterLabel(this.gradeForm.semester);
+        this.gradeSyncVisible = false;
+        this.notify(`已保存 ${newGrades.length} 门课程的成绩`);
+      } catch (error) {
+        const message = error.status === 401 ? error.message : `${error.message || "教务系统当前无法连接"}，已保存的成绩不受影响`;
+        this.notify(message, "error");
+      } finally {
+        this.gradeLoading = false;
+        this.gradeStep = "正在连接教务系统";
       }
     },
     normalizeSchoolCourse(item, index) {
@@ -682,6 +899,7 @@ createApp({
           xnm: startYear,
           xqm: term,
           kcbj: "",
+          zd_fzdm: "N305005-xs",
           page: "1",
           rows: "200",
           sidx: "",
@@ -703,7 +921,7 @@ createApp({
       return rows;
     },
     normalizeSchoolGrade(item, index) {
-      const semester = item.xnmmc && item.xqmmc ? `${item.xnmmc} 第${item.xqmmc}学期` : this.selectedSemesterLabel;
+      const semester = item.xnmmc && item.xqmmc ? `${item.xnmmc} 第${item.xqmmc}学期` : this.gradeSemesterLabel(this.gradeForm.semester);
       return {
         id: `grade-${item.key || item.jxb_id || item.kch || Date.now() + index}`,
         name: item.kcmc || item.courseName || "未知课程",
@@ -713,13 +931,15 @@ createApp({
         gpa: item.jd ?? "--",
         courseType: item.kcxzmc || item.kclbmc || "课程成绩",
         examType: item.ksxz || item.khxz || "--",
+        teacher: item.jsxm || item.xm || item.rkjs || "教师信息未提供",
         remark: item.cjbz || "",
         components: this.extractGradeComponents(item),
         remote: {
           jxbId: item.jxb_id || item.jxbid || "",
           xnm: item.xnm || "",
           xqm: item.xqm || "",
-          kcmc: item.kcmc || ""
+          kcmc: item.kcmc || "",
+          xhId: item.xh_id || ""
         },
         detailFetched: false,
         source: "whcibe"
@@ -735,6 +955,15 @@ createApp({
     },
     persistGrades() {
       localStorage.setItem(STORAGE.grades, JSON.stringify(this.grades));
+    },
+    gradeSemesterLabel(value) {
+      const option = this.semesterOptions.find(item => item.value === value);
+      return option ? option.label : value;
+    },
+    replaceGradesForSemester(semesterValue, grades) {
+      const label = this.gradeSemesterLabel(semesterValue);
+      this.grades = [...this.grades.filter(grade => grade.semester !== label), ...grades];
+      this.persistGrades();
     },
     saveGradeSnapshot(semester, grades) {
       this.gradeHistory.unshift({
@@ -754,13 +983,15 @@ createApp({
       if (grade.detailFetched || !grade.remote || !grade.remote.jxbId) return;
       this.gradeDetailLoading = true;
       try {
-        const response = await this.httpRequest("GET", GRADE_DETAIL_URL, {
-          params: {
-            jxb_id: grade.remote.jxbId,
-            xnm: grade.remote.xnm,
-            xqm: grade.remote.xqm,
-            kcmc: grade.remote.kcmc
-          },
+        const query = new URLSearchParams({
+          jxb_id: grade.remote.jxbId,
+          xnm: grade.remote.xnm,
+          xqm: grade.remote.xqm,
+          kcmc: grade.remote.kcmc,
+          ...(grade.remote.xhId ? { xh_id: grade.remote.xhId } : {})
+        });
+        const response = await this.httpRequest("GET", `${GRADE_DETAIL_URL}?${query.toString()}`, {
+          responseType: "text",
           headers: { Referer: GRADE_REFERER }
         });
         const components = this.parseGradeDetailHtml(htmlText(response));
@@ -768,7 +999,7 @@ createApp({
         grade.detailFetched = true;
         this.persistGrades();
       } catch (_error) {
-        this.notify("暂时无法获取该课程的成绩明细，已保留总评", "info");
+        this.notify("该课程暂未开放分项成绩，已保留总评和教师信息", "info");
       } finally {
         this.gradeDetailLoading = false;
       }
@@ -941,7 +1172,8 @@ createApp({
       return text.length > 12 ? `${text.slice(0, 12)}…` : text;
     },
     selectSemester(value) {
-      this.syncForm.semester = value;
+      if (this.semesterSheetTarget === "grade") this.gradeForm.semester = value;
+      else this.syncForm.semester = value;
       localStorage.setItem(STORAGE.semester, value);
       this.semesterSheetVisible = false;
       this.tapFeedback();
@@ -1027,7 +1259,11 @@ createApp({
       this.homeScope = "today";
       this.showWeekends = true;
       this.compactCards = false;
-      this.bounceEnabled = true;
+      this.bounceEnabled = false;
+      this.predictiveBackEnabled = false;
+      this.liquidGlassEnabled = false;
+      this.bottomNavGlassEnabled = false;
+      this.bottomNavClearGlassEnabled = false;
       this.hapticsEnabled = true;
       this.periodDuration = DEFAULT_PERIOD_DURATION;
       this.notify("已恢复默认设置");
