@@ -470,6 +470,17 @@
 
         <div class="settings-group">
           <h2>关于</h2>
+          <button type="button" class="setting-row" :disabled="updateChecking" @click="checkForUpdate">
+            <span class="setting-icon violet"><app-icon name="Download" :size="19"></app-icon></span>
+            <span><strong>{{ updateInfo ? '发现新版本' : '检查应用更新' }}</strong><small>{{ updateStatusText }}</small></span>
+            <em v-if="updateInfo">{{ updateInfo.version }}</em>
+            <app-icon v-else name="ChevronRight" :size="18"></app-icon>
+          </button>
+          <button v-if="updateInfo" type="button" class="setting-row" :disabled="updateDownloading" @click="startAppUpdate">
+            <span class="setting-icon blue"><app-icon name="DownloadCloud" :size="19"></app-icon></span>
+            <span><strong>{{ updateDownloading ? '正在下载更新包' : '立即更新' }}</strong><small>下载完成后打开系统安装页</small></span>
+            <app-icon name="ChevronRight" :size="18"></app-icon>
+          </button>
           <button type="button" class="setting-row" @click="openFeedbackGroup">
             <span class="setting-icon blue"><app-icon name="MessageCircle" :size="19"></app-icon></span>
             <span><strong>用户反馈</strong><small>QQ群：1075730072</small></span>
@@ -482,7 +493,7 @@
           </button>
         </div>
 
-        <p class="version-text">课序 0.9.2 Stable</p>
+        <p class="version-text">课序 0.9.3 Beta</p>
       </section>
     </main>
 

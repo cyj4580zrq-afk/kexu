@@ -9,6 +9,7 @@ const GRADE_URL = `${SCHOOL_BASE}/cjcx/cjcx_cxXsgrcj.html?doType=query`;
 const GRADE_REFERER = `${SCHOOL_BASE}/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005`;
 const GRADE_DETAIL_URL = "http://jw.whcibe.com/cjcx/cjcx_cxCjxqGjh.html";
 const GRADE_DETAIL_REFERER = "http://jw.whcibe.com/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005&layout=default";
+const APP_VERSION = "0.9.3Beta";
 const STORAGE = {
   courses: "campusflow-courses",
   history: "campusflow-sync-history",
@@ -239,6 +240,10 @@ createApp({
       pullOffset: 0,
       exitConfirmVisible: false,
       nativeApp: null,
+      updateChecking: false,
+      updateDownloading: false,
+      updateInfo: null,
+      updateStatusText: "从 GitHub Release 检查新版本",
       backButtonListener: null,
       showPassword: false,
       privacyConsent: localStorage.getItem(STORAGE.privacyConsent) === "true",
@@ -485,12 +490,14 @@ createApp({
     window.onPredictiveBackEvent = (action, progress, swipeEdge) => {
       this.handlePredictiveBackEvent(action, progress, swipeEdge);
     };
+    window.onKexuUpdateEvent = payload => this.handleUpdateEvent(payload);
     this.syncPredictiveBackVisualState();
     this.setupNativeBackButton();
     this.checkSchoolStatus();
   },
   beforeUnmount() {
     window.onPredictiveBackEvent = null;
+    window.onKexuUpdateEvent = null;
     document.body.classList.remove("pb-active", "pb-cancelling", "pb-committing", "pb-returned", "liquid-glass", "nav-glass", "nav-clear-glass");
     if (this.backButtonListener) this.backButtonListener.remove();
     if (this.tabTransitionTimer) clearTimeout(this.tabTransitionTimer);
@@ -707,6 +714,97 @@ createApp({
     async exitApplication() {
       this.exitConfirmVisible = false;
       if (this.nativeApp) await this.nativeApp.exitApp();
+    },
+    versionParts(value) {
+      const match = String(value || "").match(/(\d+)\.(\d+)\.(\d+)/);
+      return match ? match.slice(1).map(Number) : [0, 0, 0];
+    },
+    isNewerVersion(value) {
+      const latest = this.versionParts(value);
+      const current = this.versionParts(APP_VERSION);
+      for (let index = 0; index < latest.length; index += 1) {
+        if (latest[index] !== current[index]) return latest[index] > current[index];
+      }
+      return false;
+    },
+    async checkForUpdate() {
+      if (this.updateChecking) return;
+      this.updateChecking = true;
+      this.updateStatusText = "正在检查最新版本";
+      try {
+        if (window.KexuUpdater?.checkForUpdate) {
+          window.KexuUpdater.checkForUpdate();
+          return;
+        }
+        const response = await fetch("https://api.github.com/repos/cyj4580zrq-afk/kexu/releases/latest", {
+          headers: { Accept: "application/vnd.github+json" }
+        });
+        if (!response.ok) throw new Error(`更新服务返回 ${response.status}`);
+        const release = await response.json();
+        const asset = (release.assets || []).find(item => String(item.name).endsWith(".apk"));
+        this.handleUpdateEvent(asset ? {
+          type: "release",
+          version: release.tag_name,
+          downloadUrl: asset.browser_download_url,
+          releaseUrl: release.html_url,
+          notes: release.body || ""
+        } : { type: "error", message: "最新版本未附带 Android 安装包" });
+      } catch (error) {
+        this.handleUpdateEvent({ type: "error", message: error.message || "无法连接更新服务" });
+      }
+    },
+    handleUpdateEvent(payload = {}) {
+      if (payload.type === "release") {
+        this.updateChecking = false;
+        if (this.isNewerVersion(payload.version)) {
+          this.updateInfo = payload;
+          this.updateStatusText = "已找到可安装的新版本";
+        } else {
+          this.updateInfo = null;
+          this.updateStatusText = "当前已是最新版本";
+          this.notify("当前已是最新版本", "success");
+        }
+        return;
+      }
+      if (payload.type === "downloading") {
+        this.updateDownloading = true;
+        this.updateStatusText = "正在下载更新包";
+        this.notify("正在下载更新包，完成后会打开系统安装页", "info");
+        return;
+      }
+      if (payload.type === "permission_required") {
+        this.updateDownloading = false;
+        this.updateStatusText = "需要允许安装未知应用";
+        if (window.confirm("Android 需要允许课序安装更新包。现在前往系统设置开启吗？")) {
+          window.KexuUpdater?.requestInstallPermission();
+        }
+        return;
+      }
+      if (payload.type === "ready") {
+        this.updateStatusText = "已获得安装权限，请再次点击立即更新";
+        this.notify(this.updateStatusText, "success");
+        return;
+      }
+      if (payload.type === "installing") {
+        this.updateDownloading = false;
+        this.updateStatusText = "已打开系统安装页";
+        return;
+      }
+      if (payload.type === "error") {
+        this.updateChecking = false;
+        this.updateDownloading = false;
+        this.updateStatusText = "检查更新失败";
+        this.notify(`更新失败：${payload.message || "未知错误"}`, "error");
+      }
+    },
+    startAppUpdate() {
+      if (!this.updateInfo?.downloadUrl) return;
+      if (!window.confirm(`下载并安装 ${this.updateInfo.version} 吗？`)) return;
+      if (window.KexuUpdater?.downloadAndInstall) {
+        window.KexuUpdater.downloadAndInstall(this.updateInfo.downloadUrl);
+      } else {
+        window.open(this.updateInfo.downloadUrl, "_blank");
+      }
     },
     applyTheme() {
       const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
