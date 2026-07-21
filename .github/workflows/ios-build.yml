@@ -1,6 +1,7 @@
 name: iOS Build
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -22,6 +23,64 @@ permissions:
   contents: read
 
 jobs:
+  build-unsigned-ipa:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: macos-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: android-app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: android-app
+        run: npm ci
+
+      - name: Sync iOS project
+        working-directory: android-app
+        run: npm run sync:ios
+
+      - name: Archive unsigned iOS app
+        working-directory: android-app/ios
+        shell: bash
+        run: |
+          xcodebuild \
+            -project App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/Kexu.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' \
+            archive
+
+      - name: Package unsigned IPA
+        working-directory: android-app/ios
+        shell: bash
+        run: |
+          mkdir -p ipa/Payload
+          app_path="$(find build/Kexu.xcarchive/Products/Applications -maxdepth 1 -name '*.app' -print -quit)"
+          test -n "$app_path"
+          cp -R "$app_path" ipa/Payload/
+          ditto -c -k --sequesterRsrc --keepParent ipa Kexu-iOS-unsigned.ipa
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kexu-iOS-unsigned-${{ github.run_number }}
+          path: android-app/ios/Kexu-iOS-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14
+
   simulator-test:
     runs-on: macos-latest
     timeout-minutes: 15
