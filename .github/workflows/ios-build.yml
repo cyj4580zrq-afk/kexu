@@ -71,7 +71,10 @@ jobs:
           app_path="$(find build/Kexu.xcarchive/Products/Applications -maxdepth 1 -name '*.app' -print -quit)"
           test -n "$app_path"
           cp -R "$app_path" ipa/Payload/
-          ditto -c -k --sequesterRsrc --keepParent ipa Kexu-iOS-unsigned.ipa
+          (
+            cd ipa
+            ditto -c -k --sequesterRsrc --keepParent Payload ../Kexu-iOS-unsigned.ipa
+          )
 
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
