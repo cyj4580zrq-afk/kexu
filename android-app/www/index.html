@@ -12,18 +12,13 @@
   <div id="app" v-cloak>
     <main
       class="app-shell"
-      :class="[
-        { bouncing: pullOffset > 0 },
-        { 'tab-entering': tabTransitioning },
-        predictiveBackActive && predictiveBackTarget === 'secondary' ? 'pb-target-secondary' : '',
-        predictiveBackActive && predictiveBackTarget === 'home' ? 'pb-target-home' : ''
-      ]"
+      :class="[{ bouncing: pullOffset > 0 }, { 'tab-entering': tabTransitioning }]"
       :style="{ transform: pullOffset > 0 ? `translateY(${pullOffset}px)` : undefined }"
       @touchstart="handlePullStart"
       @touchmove="handlePullMove"
       @touchend="handlePullEnd"
     >
-      <section v-show="activeTab === 'schedule'" :class="{ 'pb-underlay': predictiveBackActive && predictiveBackTarget === 'secondary' }" class="page home-page">
+      <section v-show="activeTab === 'schedule'" class="page home-page">
         <header class="home-header">
           <div>
             <p class="home-date">{{ dateText }}</p>
@@ -82,12 +77,9 @@
         </button>
       </section>
 
-      <section v-show="activeTab === 'allCourses'" class="page schedule-page secondary-page">
+      <section v-show="activeTab === 'allCourses'" class="page schedule-page">
         <header class="topbar">
-          <button class="back-button" type="button" aria-label="返回首页" @click="returnToHome()">
-            <app-icon name="ChevronLeft" :size="22"></app-icon>
-          </button>
-          <div class="secondary-title"><h1>全部课表</h1><p>第 {{ selectedWeek }} 周</p></div>
+          <div class="secondary-title"><h1>课表</h1><p>第 {{ selectedWeek }} 周</p></div>
           <div class="header-actions">
             <button class="icon-button" type="button" :aria-label="scheduleView === 'grid' ? '切换到列表视图' : '切换到网格视图'" @click="toggleScheduleView">
               <app-icon :name="scheduleView === 'grid' ? 'Rows3' : 'LayoutGrid'" :size="20"></app-icon>
@@ -358,10 +350,29 @@
       <section v-show="activeTab === 'settings'" class="page standard-page">
         <header class="page-header">
           <div>
-            <p class="brand-line">PREFERENCES</p>
-            <h1>设置</h1>
+            <p class="brand-line">MY SPACE</p>
+            <h1>我的</h1>
           </div>
         </header>
+
+        <div class="settings-group">
+          <h2>常用功能</h2>
+          <button type="button" class="setting-row" @click="openTab('sync')">
+            <span class="setting-icon blue"><app-icon name="RefreshCw" :size="19"></app-icon></span>
+            <span><strong>导入课表</strong><small>{{ lastSyncText }}</small></span>
+            <app-icon name="ChevronRight" :size="18"></app-icon>
+          </button>
+          <button type="button" class="setting-row" @click="gradeSyncVisible = true">
+            <span class="setting-icon green"><app-icon name="ChartNoAxesCombined" :size="19"></app-icon></span>
+            <span><strong>查询成绩</strong><small>按学期查询并保存在本机</small></span>
+            <app-icon name="ChevronRight" :size="18"></app-icon>
+          </button>
+          <button type="button" class="setting-row" @click="openTab('history')">
+            <span class="setting-icon violet"><app-icon name="History" :size="19"></app-icon></span>
+            <span><strong>同步记录</strong><small>{{ syncHistory.length ? `已保存 ${syncHistory.length} 条记录` : '暂无同步记录' }}</small></span>
+            <app-icon name="ChevronRight" :size="18"></app-icon>
+          </button>
+        </div>
 
         <div class="settings-group">
           <h2>课表</h2>
@@ -393,6 +404,34 @@
             <span><strong>显示周末</strong><small>在完整课表中显示周六、周日</small></span>
             <label class="switch"><input v-model="showWeekends" type="checkbox"><span></span></label>
           </div>
+        </div>
+
+        <div class="settings-group">
+          <h2>提醒</h2>
+          <div class="setting-row">
+            <span class="setting-icon pink"><app-icon name="BellRing" :size="19"></app-icon></span>
+            <span><strong>上课提醒</strong><small>仅为未来课程创建本地通知</small></span>
+            <label class="switch"><input v-model="reminderEnabled" type="checkbox"><span></span></label>
+          </div>
+          <div v-if="reminderEnabled" class="setting-row reminder-date-row">
+            <span class="setting-icon amber"><app-icon name="CalendarDays" :size="19"></app-icon></span>
+            <span><strong>第一周周一</strong><small>用于计算每门课的实际上课日期</small></span>
+            <input v-model="semesterStartDate" type="date" aria-label="第一周周一日期">
+          </div>
+          <div v-if="reminderEnabled" class="setting-row period-setting">
+            <span class="setting-icon blue"><app-icon name="ClockAlert" :size="19"></app-icon></span>
+            <span><strong>提前提醒</strong><small>开课前提醒你准备出发</small></span>
+            <div class="period-stepper" aria-label="调整提前提醒分钟数">
+              <button type="button" aria-label="减少五分钟" :disabled="reminderMinutes <= 5" @click="reminderMinutes -= 5"><app-icon name="Minus" :size="15"></app-icon></button>
+              <output>{{ reminderMinutes }}<small>分钟</small></output>
+              <button type="button" aria-label="增加五分钟" :disabled="reminderMinutes >= 30" @click="reminderMinutes += 5"><app-icon name="Plus" :size="15"></app-icon></button>
+            </div>
+          </div>
+          <button v-if="reminderEnabled" type="button" class="setting-row" @click="scheduleCourseReminders">
+            <span class="setting-icon green"><app-icon name="AlarmClockCheck" :size="19"></app-icon></span>
+            <span><strong>更新上课提醒</strong><small>创建未来 45 天的有效课程提醒</small></span>
+            <app-icon name="ChevronRight" :size="18"></app-icon>
+          </button>
         </div>
 
         <div class="settings-group">
@@ -443,11 +482,6 @@
             <label class="switch"><input v-model="bounceEnabled" type="checkbox"><span></span></label>
           </div>
           <div class="setting-row">
-            <span class="setting-icon violet"><app-icon name="ArrowLeftRight" :size="19"></app-icon></span>
-            <span><strong>手势返回动效</strong><small>边缘返回时连续预览上一页</small></span>
-            <label class="switch"><input v-model="predictiveBackEnabled" type="checkbox"><span></span></label>
-          </div>
-          <div class="setting-row">
             <span class="setting-icon amber"><app-icon name="Vibrate" :size="19"></app-icon></span>
             <span><strong>触感反馈</strong><small>重要操作时轻微振动</small></span>
             <label class="switch"><input v-model="hapticsEnabled" type="checkbox"><span></span></label>
@@ -493,18 +527,18 @@
           </button>
         </div>
 
-        <p class="version-text">课序 0.9.3 Beta</p>
+        <p class="version-text">课序 0.9.4 Stable</p>
       </section>
     </main>
 
-    <nav v-if="activeTab !== 'allCourses'" class="bottom-nav" aria-label="应用导航">
+    <nav class="bottom-nav" aria-label="应用导航">
       <button v-for="tab in tabs" :key="tab.value" type="button" :class="{ active: activeTab === tab.value }" @click="openTab(tab.value)">
         <app-icon :name="tab.icon" :size="activeTab === tab.value ? 22 : 20"></app-icon>
         <span>{{ tab.label }}</span>
       </button>
     </nav>
 
-    <div v-if="weekSheetVisible" :class="['sheet-overlay', { 'pb-target': predictiveBackActive && predictiveBackKey === 'weekSheet' }]" @click.self="weekSheetVisible = false">
+    <div v-if="weekSheetVisible" class="sheet-overlay" @click.self="weekSheetVisible = false">
       <section class="bottom-sheet week-sheet">
         <div class="sheet-handle"></div>
         <header><h2>{{ weekSheetMode === 'current' ? '设置当前教学周' : '选择查看周次' }}</h2><button type="button" aria-label="关闭" @click="weekSheetVisible = false"><app-icon name="X" :size="21"></app-icon></button></header>
@@ -514,7 +548,7 @@
       </section>
     </div>
 
-    <div v-if="semesterSheetVisible" :class="['sheet-overlay', 'semester-picker-overlay', { 'pb-target': predictiveBackActive && predictiveBackKey === 'semesterSheet' }]" @click.self="semesterSheetVisible = false">
+    <div v-if="semesterSheetVisible" class="sheet-overlay semester-picker-overlay" @click.self="semesterSheetVisible = false">
       <section class="bottom-sheet semester-sheet" role="dialog" aria-modal="true" aria-labelledby="semester-title">
         <div class="sheet-handle"></div>
         <header>
@@ -537,7 +571,7 @@
       </section>
     </div>
 
-    <div v-if="detailVisible && activeCourse" :class="['sheet-overlay', { 'pb-target': predictiveBackActive && predictiveBackKey === 'detailSheet' }]" @click.self="detailVisible = false">
+    <div v-if="detailVisible && activeCourse" class="sheet-overlay" @click.self="detailVisible = false">
       <section class="bottom-sheet detail-sheet">
         <div class="sheet-handle"></div>
         <header><h2>课程详情</h2><button type="button" aria-label="关闭" @click="detailVisible = false"><app-icon name="X" :size="21"></app-icon></button></header>
@@ -555,7 +589,7 @@
       </section>
     </div>
 
-    <div v-if="gradeDetailVisible && activeGrade" :class="['sheet-overlay', { 'pb-target': predictiveBackActive && predictiveBackKey === 'gradeDetailSheet' }]" @click.self="gradeDetailVisible = false">
+    <div v-if="gradeDetailVisible && activeGrade" class="sheet-overlay" @click.self="gradeDetailVisible = false">
       <section class="bottom-sheet grade-detail-sheet">
         <div class="sheet-handle"></div>
         <header><div><h2>{{ activeGrade.name }}</h2><p>{{ activeGrade.semester }} · {{ activeGrade.courseType }}</p></div><button type="button" aria-label="关闭" @click="gradeDetailVisible = false"><app-icon name="X" :size="21"></app-icon></button></header>
@@ -570,7 +604,7 @@
       </section>
     </div>
 
-    <div v-if="gradeSyncVisible" :class="['sheet-overlay', { 'pb-target': predictiveBackActive && predictiveBackKey === 'gradeSyncSheet' }]" @click.self="gradeSyncVisible = false">
+    <div v-if="gradeSyncVisible" class="sheet-overlay" @click.self="gradeSyncVisible = false">
       <section class="bottom-sheet grade-sync-sheet" role="dialog" aria-modal="true" aria-labelledby="grade-sync-title">
         <div class="sheet-handle"></div>
         <header><div><h2 id="grade-sync-title">查询成绩</h2><p>只查询所选学期，已保存成绩不会被改动</p></div><button type="button" aria-label="关闭" @click="gradeSyncVisible = false"><app-icon name="X" :size="21"></app-icon></button></header>
@@ -586,7 +620,7 @@
       </section>
     </div>
 
-    <div v-if="addVisible" :class="['sheet-overlay', { 'pb-target': predictiveBackActive && predictiveBackKey === 'addSheet' }]" @click.self="addVisible = false">
+    <div v-if="addVisible" class="sheet-overlay" @click.self="addVisible = false">
       <section class="bottom-sheet add-sheet">
         <div class="sheet-handle"></div>
         <header><h2>添加课程</h2><button type="button" aria-label="关闭" @click="addVisible = false"><app-icon name="X" :size="21"></app-icon></button></header>
@@ -603,7 +637,7 @@
       </section>
     </div>
 
-    <div v-if="exitConfirmVisible" :class="['dialog-overlay', { 'pb-target': predictiveBackActive && predictiveBackKey === 'exitDialog' }]" @click.self="exitConfirmVisible = false">
+    <div v-if="exitConfirmVisible" class="dialog-overlay" @click.self="exitConfirmVisible = false">
       <section class="exit-dialog" role="dialog" aria-modal="true" aria-labelledby="exit-title">
         <span class="exit-dialog-icon"><app-icon name="LogOut" :size="23"></app-icon></span>
         <h2 id="exit-title">退出课序？</h2>
@@ -615,7 +649,7 @@
       </section>
     </div>
 
-    <div v-if="privacyVisible" :class="['sheet-overlay', { 'pb-target': predictiveBackActive && predictiveBackKey === 'privacySheet' }]" @click.self="privacyVisible = false">
+    <div v-if="privacyVisible" class="sheet-overlay" @click.self="privacyVisible = false">
       <section class="bottom-sheet privacy-sheet" role="dialog" aria-modal="true" aria-labelledby="privacy-title">
         <div class="sheet-handle"></div>
         <header><h2 id="privacy-title">隐私说明</h2><button type="button" aria-label="关闭" @click="privacyVisible = false"><app-icon name="X" :size="21"></app-icon></button></header>
@@ -638,6 +672,7 @@
   <script src="./vendor/capacitor.js"></script>
   <script src="./vendor/jsencrypt.min.js"></script>
   <script src="./vendor/lucide.min.js"></script>
+  <script src="./local-db.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

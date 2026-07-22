@@ -9,7 +9,7 @@ const GRADE_URL = `${SCHOOL_BASE}/cjcx/cjcx_cxXsgrcj.html?doType=query`;
 const GRADE_REFERER = `${SCHOOL_BASE}/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005`;
 const GRADE_DETAIL_URL = "http://jw.whcibe.com/cjcx/cjcx_cxCjxqGjh.html";
 const GRADE_DETAIL_REFERER = "http://jw.whcibe.com/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005&layout=default";
-const APP_VERSION = "0.9.3Beta";
+const APP_VERSION = "0.9.4-stable";
 const STORAGE = {
   courses: "campusflow-courses",
   history: "campusflow-sync-history",
@@ -24,13 +24,15 @@ const STORAGE = {
   showWeekends: "campusflow-show-weekends",
   compactCards: "campusflow-compact-cards",
   bounceEnabled: "campusflow-bounce-enabled",
-  predictiveBackEnabled: "campusflow-predictive-back-enabled",
   liquidGlassEnabled: "campusflow-liquid-glass-enabled",
   bottomNavGlassEnabled: "campusflow-bottom-nav-glass-enabled",
   bottomNavClearGlassEnabled: "campusflow-bottom-nav-clear-glass-enabled",
   hapticsEnabled: "campusflow-haptics-enabled",
   scheduleView: "campusflow-schedule-view",
   periodDuration: "campusflow-period-duration",
+  reminderEnabled: "campusflow-reminder-enabled",
+  reminderMinutes: "campusflow-reminder-minutes",
+  semesterStartDate: "campusflow-semester-start-date",
   username: "campusflow-school-username",
   semester: "campusflow-school-semester",
   privacyConsent: "campusflow-privacy-consent"
@@ -195,10 +197,9 @@ createApp({
     return {
       tabs: [
         { value: "schedule", label: "首页", icon: "House" },
-        { value: "sync", label: "同步", icon: "RefreshCw" },
+        { value: "allCourses", label: "课表", icon: "CalendarDays" },
         { value: "grades", label: "成绩", icon: "ChartNoAxesCombined" },
-        { value: "history", label: "记录", icon: "History" },
-        { value: "settings", label: "设置", icon: "Settings" }
+        { value: "settings", label: "我的", icon: "UserRound" }
       ],
       activeTab: "schedule",
       weekDays: WEEK_DAYS,
@@ -229,17 +230,21 @@ createApp({
       showWeekends: localStorage.getItem(STORAGE.showWeekends) !== "false",
       compactCards: localStorage.getItem(STORAGE.compactCards) === "true",
       bounceEnabled: localStorage.getItem(STORAGE.bounceEnabled) === "true",
-      predictiveBackEnabled: localStorage.getItem(STORAGE.predictiveBackEnabled) === "true",
       liquidGlassEnabled: localStorage.getItem(STORAGE.liquidGlassEnabled) === "true",
       bottomNavGlassEnabled: localStorage.getItem(STORAGE.bottomNavGlassEnabled) === "true",
       bottomNavClearGlassEnabled: localStorage.getItem(STORAGE.bottomNavClearGlassEnabled) === "true",
       hapticsEnabled: localStorage.getItem(STORAGE.hapticsEnabled) !== "false",
       scheduleView: localStorage.getItem(STORAGE.scheduleView) || "grid",
       periodDuration: Math.min(60, Math.max(30, Number(localStorage.getItem(STORAGE.periodDuration)) || DEFAULT_PERIOD_DURATION)),
+      reminderEnabled: localStorage.getItem(STORAGE.reminderEnabled) === "true",
+      reminderMinutes: Math.min(30, Math.max(5, Number(localStorage.getItem(STORAGE.reminderMinutes)) || 10)),
+      semesterStartDate: localStorage.getItem(STORAGE.semesterStartDate) || "",
       pullStartY: null,
       pullOffset: 0,
       exitConfirmVisible: false,
       nativeApp: null,
+      database: null,
+      databaseReady: false,
       updateChecking: false,
       updateDownloading: false,
       updateInfo: null,
@@ -247,13 +252,6 @@ createApp({
       backButtonListener: null,
       showPassword: false,
       privacyConsent: localStorage.getItem(STORAGE.privacyConsent) === "true",
-      predictiveBackActive: false,
-      predictiveBackCancelling: false,
-      predictiveBackCommitting: false,
-      predictiveBackReturned: false,
-      predictiveBackTarget: null,
-      predictiveBackKey: null,
-      predictiveBackTimer: null,
       tabTransitioning: false,
       tabTransitionTimer: null,
       suppressTabTransition: false,
@@ -429,7 +427,7 @@ createApp({
   },
   watch: {
     activeTab() {
-      if (this.suppressTabTransition || this.predictiveBackActive || this.predictiveBackCommitting || this.predictiveBackReturned) {
+      if (this.suppressTabTransition) {
         this.suppressTabTransition = false;
         return;
       }
@@ -450,7 +448,6 @@ createApp({
       localStorage.setItem(STORAGE.compactCards, String(value));
     },
     bounceEnabled(value) { localStorage.setItem(STORAGE.bounceEnabled, String(value)); },
-    predictiveBackEnabled(value) { localStorage.setItem(STORAGE.predictiveBackEnabled, String(value)); },
     liquidGlassEnabled(value) {
       this.applyLiquidGlass(value);
       localStorage.setItem(STORAGE.liquidGlassEnabled, String(value));
@@ -468,16 +465,18 @@ createApp({
     hapticsEnabled(value) { localStorage.setItem(STORAGE.hapticsEnabled, String(value)); },
     scheduleView(value) { localStorage.setItem(STORAGE.scheduleView, value); },
     periodDuration(value) { localStorage.setItem(STORAGE.periodDuration, String(value)); },
+    reminderEnabled(value) {
+      localStorage.setItem(STORAGE.reminderEnabled, String(value));
+      if (!value) this.clearCourseReminders();
+    },
+    reminderMinutes(value) { localStorage.setItem(STORAGE.reminderMinutes, String(value)); },
+    semesterStartDate(value) { localStorage.setItem(STORAGE.semesterStartDate, value); },
     privacyConsent(value) { localStorage.setItem(STORAGE.privacyConsent, String(value)); },
     selectedWeek(value) {
       localStorage.setItem(STORAGE.selectedWeek, String(value));
     }
   },
   mounted() {
-    this._predictiveBackProgress = 0;
-    this._predictiveBackEdge = 0;
-    this._predictiveBackWidth = window.innerWidth;
-    this._predictiveBackLastFrame = "";
     this.applyTheme();
     this.applyAccent(this.accentColor);
     this.applyLiquidGlass(this.liquidGlassEnabled);
@@ -487,18 +486,16 @@ createApp({
     this.systemThemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
     if (this.systemThemeQuery.addEventListener) this.systemThemeQuery.addEventListener("change", this.applyTheme);
     else this.systemThemeQuery.addListener(this.applyTheme);
-    window.onPredictiveBackEvent = (action, progress, swipeEdge) => {
-      this.handlePredictiveBackEvent(action, progress, swipeEdge);
-    };
+    window.onNativeBackEvent = () => this.handleBackButton();
     window.onKexuUpdateEvent = payload => this.handleUpdateEvent(payload);
-    this.syncPredictiveBackVisualState();
     this.setupNativeBackButton();
+    this.initializePersistentStorage();
     this.checkSchoolStatus();
   },
   beforeUnmount() {
-    window.onPredictiveBackEvent = null;
+    window.onNativeBackEvent = null;
     window.onKexuUpdateEvent = null;
-    document.body.classList.remove("pb-active", "pb-cancelling", "pb-committing", "pb-returned", "liquid-glass", "nav-glass", "nav-clear-glass");
+    document.body.classList.remove("liquid-glass", "nav-glass", "nav-clear-glass");
     if (this.backButtonListener) this.backButtonListener.remove();
     if (this.tabTransitionTimer) clearTimeout(this.tabTransitionTimer);
     if (!this.systemThemeQuery) return;
@@ -530,145 +527,11 @@ createApp({
       this.activeTab = "schedule";
       this.tapFeedback();
     },
-    applyPredictiveBackFrame(progress = this._predictiveBackProgress, swipeEdge = this._predictiveBackEdge) {
-      const safeProgress = Math.min(1, Math.max(0, Number(progress) || 0));
-      const edgeDir = swipeEdge === 0 ? 1 : -1;
-      const width = this._predictiveBackWidth || window.innerWidth;
-      const frameKey = `${safeProgress.toFixed(4)}:${swipeEdge}:${width}`;
-      if (frameKey === this._predictiveBackLastFrame) return;
-
-      this._predictiveBackProgress = safeProgress;
-      this._predictiveBackEdge = swipeEdge;
-      this._predictiveBackLastFrame = frameKey;
-      const variables = {
-        "--pb-progress": safeProgress.toFixed(4),
-        "--pb-sheet-overlay": (0.46 * (1 - safeProgress * 0.6)).toFixed(3),
-        "--pb-dialog-overlay": (0.5 * (1 - safeProgress * 0.5)).toFixed(3),
-        "--pb-sheet-shift": `${(safeProgress * 16).toFixed(2)}px`,
-        "--pb-sheet-scale": (1 - safeProgress * 0.08).toFixed(4),
-        "--pb-sheet-top-radius": `${(16 + safeProgress * 12).toFixed(2)}px`,
-        "--pb-sheet-bottom-radius": `${(safeProgress * 20).toFixed(2)}px`,
-        "--pb-dialog-scale": (1 - safeProgress * 0.12).toFixed(4),
-        "--pb-dialog-shift": `${(safeProgress * 8).toFixed(2)}px`,
-        "--pb-dialog-opacity": (1 - safeProgress * 0.35).toFixed(3),
-        "--pb-secondary-scale": (1 - safeProgress * 0.07).toFixed(4),
-        "--pb-secondary-shift": `${(edgeDir * safeProgress * Math.min(112, width * 0.28)).toFixed(2)}px`,
-        "--pb-secondary-commit-shift": `${edgeDir * (width + 40)}px`,
-        "--pb-secondary-radius": `${(safeProgress * 24).toFixed(2)}px`,
-        "--pb-secondary-shadow": (safeProgress * 0.25).toFixed(3),
-        "--pb-preview-scale": (0.93 + safeProgress * 0.07).toFixed(4),
-        "--pb-preview-opacity": (0.5 + safeProgress * 0.5).toFixed(3),
-        "--pb-preview-radius": `${((1 - safeProgress) * 20).toFixed(2)}px`,
-        "--pb-home-scale": (1 - safeProgress * 0.06).toFixed(4),
-        "--pb-home-shift": `${(edgeDir * safeProgress * 16).toFixed(2)}px`,
-        "--pb-home-radius": `${(safeProgress * 22).toFixed(2)}px`,
-        "--pb-home-shadow": (safeProgress * 0.2).toFixed(3)
-      };
-      Object.entries(variables).forEach(([key, value]) => document.documentElement.style.setProperty(key, value));
-    },
-    syncPredictiveBackVisualState() {
-      this.applyPredictiveBackFrame();
-      document.body.classList.toggle("pb-active", this.predictiveBackActive);
-      document.body.classList.toggle("pb-cancelling", this.predictiveBackCancelling);
-      document.body.classList.toggle("pb-committing", this.predictiveBackCommitting);
-      document.body.classList.toggle("pb-returned", this.predictiveBackReturned);
-    },
-    getTopPredictiveTarget() {
-      if (this.exitConfirmVisible) return { type: "dialog", key: "exitDialog" };
-      if (this.semesterSheetVisible) return { type: "sheet", key: "semesterSheet" };
-      if (this.detailVisible) return { type: "sheet", key: "detailSheet" };
-      if (this.gradeDetailVisible) return { type: "sheet", key: "gradeDetailSheet" };
-      if (this.privacyVisible) return { type: "sheet", key: "privacySheet" };
-      if (this.addVisible) return { type: "sheet", key: "addSheet" };
-      if (this.gradeSyncVisible) return { type: "sheet", key: "gradeSyncSheet" };
-      if (this.weekSheetVisible) return { type: "sheet", key: "weekSheet" };
-      if (this.activeTab !== "schedule") return { type: "secondary", key: "secondaryPage" };
-      return { type: "home", key: "homePage" };
-    },
-    handlePredictiveBackEvent(action, progress = 0, swipeEdge = 0) {
-      if (!this.predictiveBackEnabled) {
-        if (action === "complete") this.handleBackButton();
-        return;
-      }
-      if (this.predictiveBackTimer) {
-        clearTimeout(this.predictiveBackTimer);
-        this.predictiveBackTimer = null;
-      }
-      if (action === "start") {
-        const target = this.getTopPredictiveTarget();
-        this.predictiveBackTarget = target.type;
-        this.predictiveBackKey = target.key;
-        this.predictiveBackActive = true;
-        this.predictiveBackCancelling = false;
-        this.predictiveBackCommitting = false;
-        this.predictiveBackReturned = false;
-        this._predictiveBackWidth = window.innerWidth;
-        this._predictiveBackLastFrame = "";
-        this.applyPredictiveBackFrame(progress, swipeEdge);
-        this.syncPredictiveBackVisualState();
-      } else if (action === "progress") {
-        if (!this.predictiveBackActive) {
-          const target = this.getTopPredictiveTarget();
-          this.predictiveBackTarget = target.type;
-          this.predictiveBackKey = target.key;
-          this.predictiveBackActive = true;
-          this.predictiveBackCommitting = false;
-          this.predictiveBackReturned = false;
-          this._predictiveBackWidth = window.innerWidth;
-          this._predictiveBackLastFrame = "";
-          this.syncPredictiveBackVisualState();
-        }
-        this.applyPredictiveBackFrame(progress, swipeEdge);
-      } else if (action === "cancel") {
-        this.predictiveBackCancelling = true;
-        this.applyPredictiveBackFrame(0, this._predictiveBackEdge);
-        this.syncPredictiveBackVisualState();
-        this.predictiveBackTimer = setTimeout(() => {
-          this.predictiveBackActive = false;
-          this.predictiveBackCancelling = false;
-          this.predictiveBackCommitting = false;
-          this.predictiveBackReturned = false;
-          this.predictiveBackTarget = null;
-          this.predictiveBackKey = null;
-          this.syncPredictiveBackVisualState();
-        }, 260);
-      } else if (action === "complete") {
-        this.applyPredictiveBackFrame(1, this._predictiveBackEdge);
-        this.predictiveBackCancelling = false;
-        this.predictiveBackCommitting = true;
-        this.syncPredictiveBackVisualState();
-        this.predictiveBackTimer = setTimeout(() => {
-          this.predictiveBackReturned = true;
-          this.handleBackButton();
-          // The persistent home page is already rendered under the outgoing page.
-          // Commit after Vue has switched tabs so there is no temporary preview to replace.
-          this.$nextTick(() => {
-            requestAnimationFrame(() => {
-              this.predictiveBackActive = false;
-              this.predictiveBackCancelling = false;
-              this.predictiveBackCommitting = false;
-              this.predictiveBackTarget = null;
-              this.predictiveBackKey = null;
-              this.applyPredictiveBackFrame(0, this._predictiveBackEdge);
-              this.syncPredictiveBackVisualState();
-              requestAnimationFrame(() => {
-                this.predictiveBackReturned = false;
-                this.syncPredictiveBackVisualState();
-              });
-            });
-          });
-        }, 210);
-      }
-    },
     async setupNativeBackButton() {
       if (!window.Capacitor || !window.Capacitor.isNativePlatform()) return;
       this.nativeApp = window.capacitorExports.registerPlugin("App");
       this.backButtonListener = await this.nativeApp.addListener("backButton", () => {
-        // Android 13+ predictive back is owned by MainActivity. Letting Capacitor
-        // also process this event would replace the page before the gesture ends.
-        if (!this.predictiveBackEnabled && !this.predictiveBackActive) {
-          this.handleBackButton();
-        }
+        if (!window.__kexuNativeBackBridge) this.handleBackButton();
       });
     },
     handleBackButton() {
@@ -714,6 +577,110 @@ createApp({
     async exitApplication() {
       this.exitConfirmVisible = false;
       if (this.nativeApp) await this.nativeApp.exitApp();
+    },
+    async initializePersistentStorage() {
+      if (!window.KexuLocalDatabase) return;
+      try {
+        const database = new window.KexuLocalDatabase();
+        const loaded = await database.initialize({
+          courses: this.courses,
+          grades: this.grades,
+          syncHistory: this.syncHistory,
+          gradeHistory: this.gradeHistory
+        });
+        if (!loaded) return;
+        this.database = database;
+        this.databaseReady = true;
+        this.courses = loaded.courses;
+        this.grades = loaded.grades;
+        this.syncHistory = loaded.syncHistory;
+        this.gradeHistory = loaded.gradeHistory;
+      } catch (error) {
+        console.warn("SQLite 初始化失败，将继续使用本地兼容存储", error);
+      }
+    },
+    persistSyncHistory() {
+      localStorage.setItem(STORAGE.history, JSON.stringify(this.syncHistory));
+      this.database?.saveSyncHistory(this.syncHistory).catch(error => console.warn("同步记录写入 SQLite 失败", error));
+    },
+    persistGradeHistory() {
+      localStorage.setItem(STORAGE.gradeHistory, JSON.stringify(this.gradeHistory));
+      this.database?.saveGradeHistory(this.gradeHistory).catch(error => console.warn("成绩快照写入 SQLite 失败", error));
+    },
+    localNotifications() {
+      if (!window.Capacitor?.isNativePlatform() || !window.capacitorExports?.registerPlugin) {
+        throw new Error("上课提醒仅支持 Android 安装包");
+      }
+      return window.capacitorExports.registerPlugin("LocalNotifications");
+    },
+    reminderId(courseId, week) {
+      const source = `${courseId}-${week}`;
+      return source.split("").reduce((value, char) => ((value * 31) + char.charCodeAt(0)) % 2000000000, 17);
+    },
+    async clearCourseReminders(silent = true) {
+      try {
+        const notifications = this.localNotifications();
+        const pending = await notifications.getPending();
+        if (pending.notifications?.length) {
+          await notifications.cancel({ notifications: pending.notifications.map(item => ({ id: item.id })) });
+        }
+        if (!silent) this.notify("已清除上课提醒");
+      } catch (error) {
+        if (!silent) this.notify(error.message || "清除提醒失败", "warning");
+      }
+    },
+    async scheduleCourseReminders() {
+      if (!this.reminderEnabled) {
+        this.notify("请先开启上课提醒", "warning");
+        return;
+      }
+      if (!this.semesterStartDate) {
+        this.notify("请先设置第一周周一的日期", "warning");
+        return;
+      }
+      try {
+        const notifications = this.localNotifications();
+        let permissions = await notifications.checkPermissions();
+        if (permissions.display !== "granted") permissions = await notifications.requestPermissions();
+        if (permissions.display !== "granted") {
+          this.notify("未获得通知权限，无法创建上课提醒", "warning");
+          return;
+        }
+        await this.clearCourseReminders(true);
+        const termMonday = new Date(`${this.semesterStartDate}T00:00:00`);
+        const now = new Date();
+        const deadline = new Date(now);
+        deadline.setDate(deadline.getDate() + 45);
+        const scheduled = [];
+        this.courses.forEach(course => {
+          const dayOffset = WEEK_DAYS.indexOf(course.day);
+          const section = this.getCourseSections(course);
+          const sectionTime = section && this.sectionTimes.find(item => item.section === section.start);
+          if (dayOffset < 0 || !sectionTime) return;
+          const [hour, minute] = sectionTime.start.split(":").map(Number);
+          this.getCourseWeeks(course).forEach(week => {
+            const at = new Date(termMonday);
+            at.setDate(at.getDate() + ((week - 1) * 7) + dayOffset);
+            at.setHours(hour, minute - this.reminderMinutes, 0, 0);
+            if (at <= now || at > deadline) return;
+            scheduled.push({
+              id: this.reminderId(course.id, week),
+              title: `${this.reminderMinutes} 分钟后上课：${course.name}`,
+              body: `${this.formatCourseTime(course.time)} · ${course.location || "地点待定"}`,
+              schedule: { at },
+              extra: { source: "course", courseId: String(course.id), week }
+            });
+          });
+        });
+        if (!scheduled.length) {
+          this.notify("未来 45 天内没有可创建的课程提醒", "info");
+          return;
+        }
+        await notifications.schedule({ notifications: scheduled });
+        this.notify(`已创建 ${scheduled.length} 条上课提醒`);
+      } catch (error) {
+        this.notify(error.message || "创建上课提醒失败", "error");
+      }
     },
     versionParts(value) {
       const match = String(value || "").match(/(\d+)\.(\d+)\.(\d+)/);
@@ -1131,6 +1098,7 @@ createApp({
     },
     persistGrades() {
       localStorage.setItem(STORAGE.grades, JSON.stringify(this.grades));
+      this.database?.saveGrades(this.grades).catch(error => console.warn("成绩写入 SQLite 失败", error));
     },
     gradeSemesterLabel(value) {
       const option = this.semesterOptions.find(item => item.value === value);
@@ -1168,7 +1136,7 @@ createApp({
         ? record.semester !== semesterOption.value
         : this.gradeSemesterLabel(record.semester) !== semester);
       this.persistGrades();
-      localStorage.setItem(STORAGE.gradeHistory, JSON.stringify(this.gradeHistory));
+      this.persistGradeHistory();
       this.selectedGradeSemester = "全部";
       this.notify("该学期成绩已删除，可重新查询");
     },
@@ -1181,7 +1149,7 @@ createApp({
         grades: JSON.parse(JSON.stringify(grades))
       });
       this.gradeHistory = this.gradeHistory.slice(0, 20);
-      localStorage.setItem(STORAGE.gradeHistory, JSON.stringify(this.gradeHistory));
+      this.persistGradeHistory();
     },
     async openGrade(grade) {
       this.activeGrade = grade;
@@ -1290,6 +1258,7 @@ createApp({
     },
     persistCourses() {
       localStorage.setItem(STORAGE.courses, JSON.stringify(this.courses));
+      this.database?.saveCourses(this.courses).catch(error => console.warn("课程写入 SQLite 失败", error));
     },
     saveSnapshot(source, semester, courses) {
       this.syncHistory.unshift({
@@ -1301,7 +1270,7 @@ createApp({
         courses: JSON.parse(JSON.stringify(courses))
       });
       this.syncHistory = this.syncHistory.slice(0, 20);
-      localStorage.setItem(STORAGE.history, JSON.stringify(this.syncHistory));
+      this.persistSyncHistory();
     },
     restoreSnapshot(record) {
       if (!record.courses || !record.courses.length) {
@@ -1329,6 +1298,22 @@ createApp({
         }
       });
       return [...result].sort((a, b) => a - b);
+    },
+    getCourseSections(course) {
+      const match = String(course.time || "").match(/(\d+)(?:\s*-\s*(\d+))?/);
+      if (!match) return null;
+      return { start: Number(match[1]), end: Number(match[2] || match[1]) };
+    },
+    findCourseConflicts(candidate) {
+      const candidateSections = this.getCourseSections(candidate);
+      const candidateWeeks = new Set(this.getCourseWeeks(candidate));
+      if (!candidateSections || !candidateWeeks.size) return [];
+      return this.courses.filter(course => {
+        if (course.id === candidate.id || course.day !== candidate.day) return false;
+        const sections = this.getCourseSections(course);
+        if (!sections || sections.end < candidateSections.start || sections.start > candidateSections.end) return false;
+        return this.getCourseWeeks(course).some(week => candidateWeeks.has(week));
+      });
     },
     isCourseScheduledForWeek(course, week) {
       const weeks = this.getCourseWeeks(course);
@@ -1409,8 +1394,7 @@ createApp({
     },
     openAllCourses() {
       this.selectedDay = "全部";
-      this.activeTab = "allCourses";
-      this.tapFeedback();
+      this.openTab("allCourses");
     },
     openWeekSheet(mode) {
       this.weekSheetMode = mode;
@@ -1446,16 +1430,23 @@ createApp({
         this.notify("请填写课程名称、星期和节次", "warning");
         return;
       }
-      this.courses.push({
+      const course = {
         id: Date.now(),
         ...this.courseForm,
         teacher: "教师待定",
         note: "手动添加",
         source: "manual"
-      });
+      };
+      const conflicts = this.findCourseConflicts(course);
+      if (conflicts.length) {
+        const names = conflicts.slice(0, 2).map(item => item.name).join("、");
+        const more = conflicts.length > 2 ? "等" : "";
+        if (!window.confirm(`该课程与 ${names}${more} 的时间和周次重叠，仍要添加吗？`)) return;
+      }
+      this.courses.push(course);
       this.persistCourses();
       this.addVisible = false;
-      this.notify("课程已添加");
+      this.notify(conflicts.length ? "课程已添加，存在时间冲突" : "课程已添加", conflicts.length ? "warning" : "success");
     },
     deleteCourse(id) {
       if (!window.confirm("确定删除这门课程吗？")) return;
@@ -1482,12 +1473,14 @@ createApp({
       this.showWeekends = true;
       this.compactCards = false;
       this.bounceEnabled = false;
-      this.predictiveBackEnabled = false;
       this.liquidGlassEnabled = false;
       this.bottomNavGlassEnabled = false;
       this.bottomNavClearGlassEnabled = false;
       this.hapticsEnabled = true;
       this.periodDuration = DEFAULT_PERIOD_DURATION;
+      this.reminderEnabled = false;
+      this.reminderMinutes = 10;
+      this.semesterStartDate = "";
       this.notify("已恢复默认设置");
     },
     adjustPeriodDuration(step) {

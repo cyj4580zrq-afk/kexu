@@ -1,6 +1,6 @@
 {
   "name": "kexu-mobile",
-  "version": "0.9.3-beta",
+  "version": "0.9.4-stable",
   "private": true,
   "description": "课序 Android 课程表",
   "scripts": {
@@ -11,10 +11,12 @@
     "open:ios": "cap open ios"
   },
   "dependencies": {
+    "@capacitor-community/sqlite": "^8.1.0",
     "@capacitor/android": "8.4.2",
     "@capacitor/app": "^8.1.1",
     "@capacitor/core": "8.4.2",
     "@capacitor/ios": "^8.4.2",
+    "@capacitor/local-notifications": "^8.2.1",
     "axios": "^1.18.1",
     "element-plus": "2.11.4",
     "jsencrypt": "^3.3.2",
