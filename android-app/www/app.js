@@ -9,7 +9,7 @@ const GRADE_URL = `${SCHOOL_BASE}/cjcx/cjcx_cxXsgrcj.html?doType=query`;
 const GRADE_REFERER = `${SCHOOL_BASE}/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005`;
 const GRADE_DETAIL_URL = "http://jw.whcibe.com/cjcx/cjcx_cxCjxqGjh.html";
 const GRADE_DETAIL_REFERER = "http://jw.whcibe.com/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005&layout=default";
-const APP_VERSION = "0.9.4-stable";
+const APP_VERSION = "0.9.6-stable";
 const STORAGE = {
   courses: "campusflow-courses",
   history: "campusflow-sync-history",
@@ -249,6 +249,9 @@ createApp({
       updateDownloading: false,
       updateInfo: null,
       updateStatusText: "从 GitHub Release 检查新版本",
+      updatePromptVisible: false,
+      autoUpdateCheckPending: false,
+      autoUpdateTimer: null,
       backButtonListener: null,
       showPassword: false,
       privacyConsent: localStorage.getItem(STORAGE.privacyConsent) === "true",
@@ -491,12 +494,14 @@ createApp({
     this.setupNativeBackButton();
     this.initializePersistentStorage();
     this.checkSchoolStatus();
+    this.autoUpdateTimer = setTimeout(() => this.checkForUpdate({ silent: true }), 1100);
   },
   beforeUnmount() {
     window.onNativeBackEvent = null;
     window.onKexuUpdateEvent = null;
     document.body.classList.remove("liquid-glass", "nav-glass", "nav-clear-glass");
     if (this.backButtonListener) this.backButtonListener.remove();
+    if (this.autoUpdateTimer) clearTimeout(this.autoUpdateTimer);
     if (this.tabTransitionTimer) clearTimeout(this.tabTransitionTimer);
     if (!this.systemThemeQuery) return;
     if (this.systemThemeQuery.removeEventListener) this.systemThemeQuery.removeEventListener("change", this.applyTheme);
@@ -535,6 +540,10 @@ createApp({
       });
     },
     handleBackButton() {
+      if (this.updatePromptVisible) {
+        this.updatePromptVisible = false;
+        return;
+      }
       if (this.exitConfirmVisible) {
         this.exitConfirmVisible = false;
         return;
@@ -694,10 +703,11 @@ createApp({
       }
       return false;
     },
-    async checkForUpdate() {
+    async checkForUpdate({ silent = false } = {}) {
       if (this.updateChecking) return;
       this.updateChecking = true;
-      this.updateStatusText = "正在检查最新版本";
+      this.autoUpdateCheckPending = silent;
+      if (!silent) this.updateStatusText = "正在检查最新版本";
       try {
         if (window.KexuUpdater?.checkForUpdate) {
           window.KexuUpdater.checkForUpdate();
@@ -723,14 +733,17 @@ createApp({
     },
     handleUpdateEvent(payload = {}) {
       if (payload.type === "release") {
+        const silent = this.autoUpdateCheckPending;
+        this.autoUpdateCheckPending = false;
         this.updateChecking = false;
         if (this.isNewerVersion(payload.version)) {
           this.updateInfo = payload;
           this.updateStatusText = "已找到可安装的新版本";
+          if (silent) this.updatePromptVisible = true;
         } else {
           this.updateInfo = null;
           this.updateStatusText = "当前已是最新版本";
-          this.notify("当前已是最新版本", "success");
+          if (!silent) this.notify("当前已是最新版本", "success");
         }
         return;
       }
@@ -759,15 +772,18 @@ createApp({
         return;
       }
       if (payload.type === "error") {
+        const silent = this.autoUpdateCheckPending;
+        this.autoUpdateCheckPending = false;
         this.updateChecking = false;
         this.updateDownloading = false;
         this.updateStatusText = "检查更新失败";
-        this.notify(`更新失败：${payload.message || "未知错误"}`, "error");
+        if (!silent) this.notify(`更新失败：${payload.message || "未知错误"}`, "error");
       }
     },
-    startAppUpdate() {
+    startAppUpdate(skipConfirmation = false) {
       if (!this.updateInfo?.downloadUrl) return;
-      if (!window.confirm(`下载并安装 ${this.updateInfo.version} 吗？`)) return;
+      if (!skipConfirmation && !window.confirm(`下载并安装 ${this.updateInfo.version} 吗？`)) return;
+      this.updatePromptVisible = false;
       if (window.KexuUpdater?.downloadAndInstall) {
         window.KexuUpdater.downloadAndInstall(this.updateInfo.downloadUrl);
       } else {

@@ -527,7 +527,7 @@
           </button>
         </div>
 
-        <p class="version-text">课序 0.9.4 Stable</p>
+        <p class="version-text">课序 0.9.6 Stable</p>
       </section>
     </main>
 
@@ -645,6 +645,18 @@
         <div class="exit-dialog-actions">
           <button type="button" @click="exitConfirmVisible = false">继续使用</button>
           <button type="button" class="confirm-exit" @click="exitApplication">退出应用</button>
+        </div>
+      </section>
+    </div>
+
+    <div v-if="updatePromptVisible && updateInfo" class="dialog-overlay" @click.self="updatePromptVisible = false">
+      <section class="exit-dialog update-dialog" role="dialog" aria-modal="true" aria-labelledby="update-title">
+        <span class="exit-dialog-icon update-dialog-icon"><app-icon name="Download" :size="23"></app-icon></span>
+        <h2 id="update-title">发现新版本</h2>
+        <p><strong>{{ updateInfo.version }}</strong> 已可安装，包含稳定性与体验优化。</p>
+        <div class="exit-dialog-actions">
+          <button type="button" @click="updatePromptVisible = false">稍后再说</button>
+          <button type="button" class="confirm-exit" @click="startAppUpdate(true)">立即更新</button>
         </div>
       </section>
     </div>
