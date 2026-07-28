@@ -555,22 +555,31 @@
           <div><h2 id="semester-title">{{ semesterSheetTarget === 'grade' ? '查询成绩学期' : '选择课表学期' }}</h2><p>{{ semesterRangeLabel }}</p></div>
           <button type="button" aria-label="关闭" @click="semesterSheetVisible = false"><app-icon name="X" :size="21"></app-icon></button>
         </header>
-        <div ref="semesterList" class="semester-list">
-          <button
-            v-for="semester in semesterOptions"
-            :key="semester.value"
-            type="button"
-            :class="['semester-option', { active: (semesterSheetTarget === 'grade' ? gradeForm.semester : syncForm.semester) === semester.value }]"
-            @click="selectSemester(semester.value)"
-          >
-            <span class="semester-number">{{ semester.value.endsWith('-1') ? '1' : '2' }}</span>
-            <span class="semester-copy">
-              <strong>{{ semester.startYear }}—{{ semester.startYear + 1 }}</strong>
-              <small>{{ semester.term === 1 ? '第一学期' : '第二学期' }}<em v-if="semester.value === currentSemesterValue">当前学期</em></small>
-            </span>
-            <span class="semester-check"><app-icon v-if="(semesterSheetTarget === 'grade' ? gradeForm.semester : syncForm.semester) === semester.value" name="Check" :size="16"></app-icon></span>
-          </button>
+        <div class="semester-wheel-picker">
+          <div class="semester-wheel-highlight" aria-hidden="true"></div>
+          <div class="semester-wheel-column">
+            <span class="semester-wheel-caption">学年</span>
+            <div ref="semesterYearWheel" class="semester-wheel" role="listbox" aria-label="选择学年" @scroll.passive="onSemesterWheelScroll('year', $event)">
+              <button
+                v-for="year in semesterYears"
+                :key="year"
+                type="button"
+                :data-wheel-value="year"
+                :class="{ active: semesterWheelYear === year }"
+                @click="setSemesterWheel('year', year)"
+              >{{ year }}—{{ year + 1 }}</button>
+            </div>
+          </div>
+          <div class="semester-wheel-column semester-term-wheel">
+            <span class="semester-wheel-caption">学期</span>
+            <div ref="semesterTermWheel" class="semester-wheel" role="listbox" aria-label="选择学期" @scroll.passive="onSemesterWheelScroll('term', $event)">
+              <button type="button" data-wheel-value="1" :class="{ active: semesterWheelTerm === 1 }" @click="setSemesterWheel('term', 1)">第一学期</button>
+              <button type="button" data-wheel-value="2" :class="{ active: semesterWheelTerm === 2 }" @click="setSemesterWheel('term', 2)">第二学期</button>
+            </div>
+          </div>
         </div>
+        <div class="semester-wheel-result">{{ semesterWheelLabel }}</div>
+        <button type="button" class="primary-button semester-wheel-confirm" @click="confirmSemesterWheel">确定</button>
       </section>
     </div>
 

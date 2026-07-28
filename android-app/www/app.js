@@ -215,6 +215,9 @@ createApp({
       weekSheetMode: "view",
       semesterSheetVisible: false,
       semesterSheetTarget: "course",
+      semesterWheelYear: Number(String(semester).split("-")[0]) || currentAcademicYearStart(),
+      semesterWheelTerm: Number(String(semester).split("-")[2]) || 1,
+      semesterWheelScrollTimer: null,
       privacyVisible: false,
       detailVisible: false,
       gradeDetailVisible: false,
@@ -414,7 +417,13 @@ createApp({
         ]);
     },
     semesterRangeLabel() {
-      return `${this.semesterOptions.length} 个学期 · 上下滑动选择`;
+      return `${this.semesterYears.length} 个学年 · 双轮盘滑动选择`;
+    },
+    semesterYears() {
+      return [...new Set(this.semesterOptions.map(option => option.startYear))].sort((a, b) => b - a);
+    },
+    semesterWheelLabel() {
+      return `${this.semesterWheelYear}-${this.semesterWheelYear + 1} 学年 第${this.semesterWheelTerm === 1 ? "一" : "二"}学期`;
     },
     currentSemesterValue() {
       return defaultSemester();
@@ -1416,13 +1425,49 @@ createApp({
     },
     openSemesterSheet(target) {
       this.semesterSheetTarget = target;
+      const selected = target === "grade" ? this.gradeForm.semester : this.syncForm.semester;
+      const [startYear, _endYear, term] = String(selected || defaultSemester()).split("-").map(Number);
+      this.semesterWheelYear = this.semesterYears.includes(startYear) ? startYear : currentAcademicYearStart();
+      this.semesterWheelTerm = term === 2 ? 2 : 1;
       this.semesterSheetVisible = true;
       this.$nextTick(() => {
-        const list = this.$refs.semesterList;
-        const active = list && list.querySelector(".semester-option.active");
-        if (!list || !active) return;
-        list.scrollTop = Math.max(0, active.offsetTop - (list.clientHeight - active.offsetHeight) / 2);
+        this.scrollSemesterWheelTo("year", this.semesterWheelYear, false);
+        this.scrollSemesterWheelTo("term", this.semesterWheelTerm, false);
       });
+    },
+    scrollSemesterWheelTo(type, value, smooth = true) {
+      const wheel = type === "year" ? this.$refs.semesterYearWheel : this.$refs.semesterTermWheel;
+      if (!wheel) return;
+      const item = wheel.querySelector(`[data-wheel-value="${value}"]`);
+      if (!item) return;
+      wheel.scrollTo({
+        top: item.offsetTop - wheel.offsetTop - (wheel.clientHeight - item.offsetHeight) / 2,
+        behavior: smooth ? "smooth" : "auto"
+      });
+    },
+    setSemesterWheel(type, value) {
+      if (type === "year") this.semesterWheelYear = Number(value);
+      else this.semesterWheelTerm = Number(value);
+      this.scrollSemesterWheelTo(type, value);
+      this.tapFeedback();
+    },
+    onSemesterWheelScroll(type, event) {
+      const wheel = event.currentTarget;
+      const center = wheel.scrollTop + wheel.clientHeight / 2;
+      const items = [...wheel.querySelectorAll("[data-wheel-value]")];
+      const closest = items.reduce((best, item) => {
+        const distance = Math.abs(item.offsetTop - wheel.offsetTop + item.offsetHeight / 2 - center);
+        return !best || distance < best.distance ? { item, distance } : best;
+      }, null);
+      if (!closest) return;
+      const value = Number(closest.item.dataset.wheelValue);
+      if (type === "year") this.semesterWheelYear = value;
+      else this.semesterWheelTerm = value;
+      clearTimeout(this.semesterWheelScrollTimer);
+      this.semesterWheelScrollTimer = setTimeout(() => this.scrollSemesterWheelTo(type, value), 90);
+    },
+    confirmSemesterWheel() {
+      this.selectSemester(`${this.semesterWheelYear}-${this.semesterWheelYear + 1}-${this.semesterWheelTerm}`);
     },
     selectSemester(value) {
       if (this.semesterSheetTarget === "grade") this.gradeForm.semester = value;

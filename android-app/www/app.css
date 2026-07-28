@@ -502,29 +502,20 @@ body.dark .focus-topline em { background: rgba(0,0,0,.07); }
 .semester-sheet { max-height: calc(84vh - var(--safe-top)); }
 .grade-sync-sheet { max-height: calc(86svh - var(--safe-top)); }
 .semester-sheet header { align-items: flex-start; }
-.semester-list {
-  display: grid;
-  max-height: min(56svh, 480px);
-  gap: 7px;
-  padding: 4px 2px 18px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scroll-behavior: smooth;
-  scroll-snap-type: y proximity;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
-.semester-list::-webkit-scrollbar { display: none; }
-.semester-option { display: grid; grid-template-columns: 38px minmax(0,1fr) 24px; min-height: 62px; align-items: center; gap: 11px; padding: 8px 12px; scroll-snap-align: center; text-align: left; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
-.semester-option.active { border-color: var(--blue); background: var(--blue-soft); }
-.semester-number { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 7px; background: var(--surface-muted); color: var(--muted); font-size: 14px; font-weight: 800; }
-.semester-option.active .semester-number { background: var(--blue); color: #fff; }
-.semester-copy { display: grid; gap: 4px; }
-.semester-copy strong { font-size: 14px; }
-.semester-copy small { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; }
-.semester-copy small em { padding: 2px 5px; border-radius: 4px; background: var(--blue-soft); color: var(--blue); font-size: 9px; font-style: normal; font-weight: 750; }
-.semester-check { display: grid; width: 22px; height: 22px; place-items: center; border: 1.5px solid var(--line); border-radius: 50%; color: #fff; }
-.semester-option.active .semester-check { border-color: var(--blue); background: var(--blue); }
+.semester-wheel-picker { position: relative; display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); height: 288px; gap: 8px; overflow: hidden; border-block: 1px solid var(--line); }
+.semester-wheel-picker::before,
+.semester-wheel-picker::after { position: absolute; z-index: 3; right: 0; left: 0; height: 80px; pointer-events: none; content: ""; }
+.semester-wheel-picker::before { top: 30px; background: linear-gradient(to bottom, var(--surface) 12%, transparent); }
+.semester-wheel-picker::after { bottom: 0; background: linear-gradient(to top, var(--surface) 12%, transparent); }
+.semester-wheel-highlight { position: absolute; z-index: 0; top: 158px; right: 0; left: 0; height: 50px; transform: translateY(-50%); border-block: 1px solid color-mix(in srgb, var(--blue) 34%, var(--line)); background: var(--blue-soft); pointer-events: none; }
+.semester-wheel-column { position: relative; z-index: 1; display: grid; grid-template-rows: 30px minmax(0, 1fr); min-width: 0; min-height: 0; height: 100%; overflow: hidden; }
+.semester-wheel-caption { z-index: 4; display: grid; place-items: center; color: var(--muted); font-size: 11px; font-weight: 650; pointer-events: none; }
+.semester-wheel { box-sizing: border-box; height: 100%; padding-block: 103px 105px; overflow-y: auto; overscroll-behavior: contain; scroll-snap-type: y mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.semester-wheel::-webkit-scrollbar { display: none; }
+.semester-wheel button { display: block; width: 100%; height: 50px; padding: 0 5px; scroll-snap-align: center; border: 0; background: transparent; color: var(--muted); font-size: 14px; white-space: nowrap; transition: color .16s ease, transform .16s ease; }
+.semester-wheel button.active { color: var(--text); font-size: 16px; font-weight: 800; transform: scale(1.02); }
+.semester-wheel-result { margin-top: 14px; text-align: center; color: var(--muted); font-size: 12px; }
+.semester-wheel-confirm { width: 100%; margin-top: 12px; }
 
 .detail-title { display: grid; grid-template-columns: 5px minmax(0,1fr) auto; gap: 12px; align-items: center; margin-bottom: 18px; padding: 14px; border: 1px solid var(--line); border-radius: 8px; }
 .detail-title > span { width: 5px; height: 44px; border-radius: 3px; background: var(--blue); }
@@ -612,7 +603,7 @@ body.liquid-glass .period-stepper,
 body.liquid-glass .mini-segment,
 body.liquid-glass .bottom-sheet,
 body.liquid-glass .exit-dialog,
-body.liquid-glass .semester-option,
+body.liquid-glass .semester-wheel-highlight,
 body.liquid-glass .detail-title,
 body.liquid-glass .grade-detail-total,
 body.liquid-glass .grade-teacher-detail,
