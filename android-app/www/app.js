@@ -397,8 +397,9 @@ createApp({
     },
     semesterOptions() {
       const currentStart = currentAcademicYearStart();
+      const latestStart = Math.max(currentStart + 1, 2035);
       const startYears = new Set();
-      for (let start = currentStart + 1; start >= currentStart - 12; start -= 1) startYears.add(start);
+      for (let start = latestStart; start >= currentStart - 12; start -= 1) startYears.add(start);
 
       [this.syncForm.semester, this.gradeForm.semester].forEach(value => {
         const start = Number(String(value || "").split("-")[0]);
