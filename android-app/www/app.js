@@ -219,6 +219,9 @@ createApp({
       semesterWheelTerm: Number(String(semester).split("-")[2]) || 1,
       semesterWheelScrollTimer: null,
       transferVisible: false,
+      transferCode: "",
+      transferImportCode: "",
+      transferBusy: false,
       privacyVisible: false,
       detailVisible: false,
       gradeDetailVisible: false,
@@ -1335,43 +1338,85 @@ createApp({
         courses
       };
     },
-    async exportScheduleFile() {
+    bytesToBase64Url(bytes) {
+      let binary = "";
+      for (let index = 0; index < bytes.length; index += 32768) {
+        binary += String.fromCharCode(...bytes.subarray(index, index + 32768));
+      }
+      return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+    },
+    base64UrlToBytes(value) {
+      const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+      const padded = normalized + "=".repeat((4 - normalized.length % 4) % 4);
+      const binary = atob(padded);
+      return Uint8Array.from(binary, character => character.charCodeAt(0));
+    },
+    async encodeScheduleCode(payload) {
+      const bytes = new TextEncoder().encode(JSON.stringify(payload));
+      if ("CompressionStream" in window) {
+        const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream("gzip"));
+        const compressed = new Uint8Array(await new Response(stream).arrayBuffer());
+        return `KEXU1:${this.bytesToBase64Url(compressed)}`;
+      }
+      return `KEXU1J:${this.bytesToBase64Url(bytes)}`;
+    },
+    async decodeScheduleCode(code) {
+      const compact = String(code || "").replace(/\s+/g, "");
+      if (!compact || compact.length > 120000) throw new Error("课表代码为空或过长");
+      let bytes;
+      if (compact.startsWith("KEXU1:")) {
+        if (!("DecompressionStream" in window)) throw new Error("当前设备无法解压这段课表代码");
+        const compressed = this.base64UrlToBytes(compact.slice(6));
+        const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream("gzip"));
+        bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+      } else if (compact.startsWith("KEXU1J:")) {
+        bytes = this.base64UrlToBytes(compact.slice(7));
+      } else {
+        throw new Error("课表代码应以 KEXU1: 开头");
+      }
+      return JSON.parse(new TextDecoder().decode(bytes));
+    },
+    async generateScheduleCode() {
       if (!this.courses.length) {
         this.notify("当前没有可导出的课程", "warning");
         return;
       }
-      const payload = this.scheduleExportPayload();
-      const content = JSON.stringify(payload, null, 2);
-      const date = new Date().toISOString().slice(0, 10);
-      const filename = `课序课表_${payload.semester}_${date}.kexu`;
-      const file = new File([content], filename, { type: "application/json" });
+      this.transferBusy = true;
       try {
-        if (navigator.share && navigator.canShare?.({ files: [file] })) {
-          await navigator.share({
-            title: "课序课表",
-            text: `${payload.semester} · ${payload.courses.length} 门课程`,
-            files: [file]
-          });
-          this.notify("课表文件已分享");
-          return;
-        }
+        this.transferCode = await this.encodeScheduleCode(this.scheduleExportPayload());
+        this.notify("课表代码已生成");
       } catch (error) {
-        if (error?.name === "AbortError") return;
-        console.warn("系统分享不可用，改用文件下载", error);
+        this.notify(error.message || "课表代码生成失败", "error");
+      } finally {
+        this.transferBusy = false;
       }
-      const url = URL.createObjectURL(file);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = filename;
-      anchor.style.display = "none";
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      this.notify("课表文件已导出");
     },
-    chooseScheduleFile() {
-      this.$refs.scheduleImportInput?.click();
+    async copyScheduleCode() {
+      if (!this.transferCode) return;
+      try {
+        if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(this.transferCode);
+        else {
+          const textarea = this.$refs.transferCodeOutput;
+          textarea.focus();
+          textarea.select();
+          document.execCommand("copy");
+        }
+        this.notify("课表代码已复制");
+      } catch (_error) {
+        this.notify("复制失败，请长按代码手动复制", "warning");
+      }
+    },
+    async shareScheduleCode() {
+      if (!this.transferCode) return;
+      if (!navigator.share) {
+        await this.copyScheduleCode();
+        return;
+      }
+      try {
+        await navigator.share({ title: "课序课表代码", text: this.transferCode });
+      } catch (error) {
+        if (error?.name !== "AbortError") this.notify("分享失败，可复制代码后发送", "warning");
+      }
     },
     sanitizeImportedCourses(courses) {
       if (!Array.isArray(courses) || courses.length > 300) return [];
@@ -1385,31 +1430,32 @@ createApp({
           location: String(course?.location || "地点待定").trim().slice(0, 100),
           teacher: String(course?.teacher || "教师待定").trim().slice(0, 60),
           weekRange: String(course?.weekRange || "未知周次").trim().slice(0, 120),
-          note: String(course?.note || "从课序课表文件导入").trim().slice(0, 160),
+          note: String(course?.note || "从课序分享代码导入").trim().slice(0, 160),
           source: "kexu-share"
         }))
         .filter(course => course.name && WEEK_DAYS.includes(course.day) && course.time);
     },
-    async importScheduleFile(event) {
-      const input = event.target;
-      const file = input.files?.[0];
-      if (!file) return;
+    async importScheduleCode() {
+      if (!this.transferImportCode.trim()) {
+        this.notify("请先粘贴课表代码", "warning");
+        return;
+      }
+      this.transferBusy = true;
       try {
-        if (file.size > 2 * 1024 * 1024) throw new Error("课表文件不能超过 2 MB");
-        const payload = JSON.parse(await file.text());
+        const payload = await this.decodeScheduleCode(this.transferImportCode);
         if (payload?.format !== "kexu.schedule" || Number(payload.schemaVersion) !== 1) {
-          throw new Error("这不是有效的课序课表文件");
+          throw new Error("这不是有效的课序课表代码");
         }
         const courses = this.sanitizeImportedCourses(payload.courses);
         if (!courses.length || courses.length !== payload.courses.length) {
-          throw new Error("课表文件中的课程数据不完整");
+          throw new Error("课表代码中的课程数据不完整");
         }
         const semester = /^\d{4}-\d{4}-[12]$/.test(String(payload.semester || ""))
           ? String(payload.semester)
           : this.syncForm.semester;
         if (!window.confirm(`导入“${semester}”的 ${courses.length} 门课程？当前课表将自动备份后被替换。`)) return;
 
-        if (this.courses.length) this.saveSnapshot("文件导入前自动备份", this.syncForm.semester, this.courses);
+        if (this.courses.length) this.saveSnapshot("代码导入前自动备份", this.syncForm.semester, this.courses);
         this.courses = courses;
         this.syncForm.semester = semester;
         localStorage.setItem(STORAGE.semester, semester);
@@ -1431,14 +1477,15 @@ createApp({
         }
 
         this.persistCourses();
-        this.saveSnapshot("课序文件导入", semester, courses);
+        this.saveSnapshot("课序代码导入", semester, courses);
+        this.transferImportCode = "";
         this.transferVisible = false;
         this.activeTab = "schedule";
         this.notify(`已离线导入 ${courses.length} 门课程`);
       } catch (error) {
-        this.notify(error.message || "课表文件读取失败", "error");
+        this.notify(error.message || "课表代码解析失败", "error");
       } finally {
-        input.value = "";
+        this.transferBusy = false;
       }
     },
     saveSnapshot(source, semester, courses) {

@@ -374,7 +374,7 @@
           </button>
           <button type="button" class="setting-row" @click="transferVisible = true">
             <span class="setting-icon cyan"><app-icon name="ArrowLeftRight" :size="19"></app-icon></span>
-            <span><strong>课表迁移</strong><small>导出文件，供另一台手机离线导入</small></span>
+            <span><strong>课表迁移</strong><small>生成代码，供另一台手机离线导入</small></span>
             <app-icon name="ChevronRight" :size="18"></app-icon>
           </button>
         </div>
@@ -561,21 +561,31 @@
           <button type="button" aria-label="关闭" @click="transferVisible = false"><app-icon name="X" :size="21"></app-icon></button>
         </header>
         <div class="transfer-summary">
-          <span class="setting-icon blue"><app-icon name="FileJson2" :size="21"></app-icon></span>
-          <div><strong>{{ selectedSemesterLabel }}</strong><small>{{ courses.length }} 门课程可导出</small></div>
+          <span class="setting-icon blue"><app-icon name="Braces" :size="21"></app-icon></span>
+          <div><strong>{{ selectedSemesterLabel }}</strong><small>{{ courses.length }} 门课程可生成分享代码</small></div>
         </div>
         <div class="transfer-actions">
-          <button type="button" class="primary-button" :disabled="!courses.length" @click="exportScheduleFile">
-            <app-icon name="Share2" :size="19"></app-icon>导出并分享课表
+          <button type="button" class="primary-button" :disabled="!courses.length || transferBusy" @click="generateScheduleCode">
+            <app-icon name="Sparkles" :size="19"></app-icon>{{ transferBusy ? '正在处理' : '生成课表代码' }}
           </button>
-          <button type="button" class="secondary-button" @click="chooseScheduleFile">
-            <app-icon name="FileUp" :size="19"></app-icon>从手机导入课表文件
+          <div v-if="transferCode" class="transfer-code-result">
+            <label>发送下面这串代码</label>
+            <textarea ref="transferCodeOutput" :value="transferCode" readonly rows="4" aria-label="已生成的课表代码"></textarea>
+            <div>
+              <button type="button" class="secondary-button" @click="copyScheduleCode"><app-icon name="Copy" :size="18"></app-icon>复制</button>
+              <button type="button" class="secondary-button" @click="shareScheduleCode"><app-icon name="Share2" :size="18"></app-icon>分享</button>
+            </div>
+          </div>
+          <div class="transfer-divider"><span>接收课表</span></div>
+          <label class="transfer-input-label" for="schedule-code-input">粘贴对方发来的代码</label>
+          <textarea id="schedule-code-input" v-model.trim="transferImportCode" rows="4" placeholder="KEXU1:..." aria-label="粘贴课表代码"></textarea>
+          <button type="button" class="secondary-button" :disabled="!transferImportCode.trim() || transferBusy" @click="importScheduleCode">
+            <app-icon name="ClipboardPaste" :size="19"></app-icon>解析并导入课表
           </button>
-          <input ref="scheduleImportInput" class="visually-hidden" type="file" accept=".kexu,.json,application/json" @change="importScheduleFile">
         </div>
         <div class="transfer-note">
           <app-icon name="ShieldCheck" :size="18"></app-icon>
-          <p>文件仅包含课程、学期和课时设置，不含学号、密码或成绩。导入会替换当前课表，并自动将原课表保存到同步记录。</p>
+          <p>代码仅包含课程、学期和课时设置，不含学号、密码或成绩。导入会替换当前课表，并自动将原课表保存到同步记录。</p>
         </div>
       </section>
     </div>
