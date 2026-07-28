@@ -373,6 +373,17 @@ body.dark .focus-topline em { background: rgba(0,0,0,.07); }
 .privacy-content p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.75; }
 .privacy-content .privacy-emphasis { padding: 12px 14px; border-radius: 8px; background: var(--blue-soft); color: var(--text); font-weight: 650; }
 .privacy-confirm { width: 100%; flex: none; }
+.transfer-sheet { max-height: calc(72svh - var(--safe-top)); }
+.transfer-summary { display: grid; grid-template-columns: 46px minmax(0, 1fr); align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-muted); }
+.transfer-summary .setting-icon { width: 46px; height: 46px; }
+.transfer-summary div { display: grid; min-width: 0; gap: 5px; }
+.transfer-summary strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.transfer-summary small { color: var(--muted); font-size: 11px; }
+.transfer-actions { display: grid; gap: 10px; margin-top: 14px; }
+.transfer-actions .primary-button { width: 100%; margin-top: 0; }
+.transfer-note { display: flex; align-items: flex-start; gap: 9px; margin: 16px 2px 0; color: var(--muted); }
+.transfer-note p { margin: 0; font-size: 11px; line-height: 1.65; }
+.visually-hidden { position: fixed !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; clip-path: inset(50%) !important; white-space: nowrap !important; }
 .fallback-import { margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--line); }
 .fallback-import summary { color: var(--muted); font-size: 13px; font-weight: 700; }
 .fallback-import p { color: var(--muted); font-size: 12px; }
@@ -605,6 +616,7 @@ body.liquid-glass .bottom-sheet,
 body.liquid-glass .exit-dialog,
 body.liquid-glass .semester-wheel-highlight,
 body.liquid-glass .detail-title,
+body.liquid-glass .transfer-summary,
 body.liquid-glass .grade-detail-total,
 body.liquid-glass .grade-teacher-detail,
 body.liquid-glass .grade-components,

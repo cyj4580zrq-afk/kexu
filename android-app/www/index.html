@@ -372,6 +372,11 @@
             <span><strong>同步记录</strong><small>{{ syncHistory.length ? `已保存 ${syncHistory.length} 条记录` : '暂无同步记录' }}</small></span>
             <app-icon name="ChevronRight" :size="18"></app-icon>
           </button>
+          <button type="button" class="setting-row" @click="transferVisible = true">
+            <span class="setting-icon cyan"><app-icon name="ArrowLeftRight" :size="19"></app-icon></span>
+            <span><strong>课表迁移</strong><small>导出文件，供另一台手机离线导入</small></span>
+            <app-icon name="ChevronRight" :size="18"></app-icon>
+          </button>
         </div>
 
         <div class="settings-group">
@@ -527,7 +532,7 @@
           </button>
         </div>
 
-        <p class="version-text">课序 0.9.8 Stable</p>
+        <p class="version-text">课序 0.9.9 Beta</p>
       </section>
     </main>
 
@@ -544,6 +549,33 @@
         <header><h2>{{ weekSheetMode === 'current' ? '设置当前教学周' : '选择查看周次' }}</h2><button type="button" aria-label="关闭" @click="weekSheetVisible = false"><app-icon name="X" :size="21"></app-icon></button></header>
         <div class="week-grid">
           <button v-for="week in 30" :key="week" type="button" :class="{ active: (weekSheetMode === 'current' ? currentWeek : selectedWeek) === week }" @click="selectWeek(week)">第 {{ week }} 周</button>
+        </div>
+      </section>
+    </div>
+
+    <div v-if="transferVisible" class="sheet-overlay" @click.self="transferVisible = false">
+      <section class="bottom-sheet transfer-sheet" role="dialog" aria-modal="true" aria-labelledby="transfer-title">
+        <div class="sheet-handle"></div>
+        <header>
+          <div><h2 id="transfer-title">课表迁移</h2><p>无需教务系统或后台服务器</p></div>
+          <button type="button" aria-label="关闭" @click="transferVisible = false"><app-icon name="X" :size="21"></app-icon></button>
+        </header>
+        <div class="transfer-summary">
+          <span class="setting-icon blue"><app-icon name="FileJson2" :size="21"></app-icon></span>
+          <div><strong>{{ selectedSemesterLabel }}</strong><small>{{ courses.length }} 门课程可导出</small></div>
+        </div>
+        <div class="transfer-actions">
+          <button type="button" class="primary-button" :disabled="!courses.length" @click="exportScheduleFile">
+            <app-icon name="Share2" :size="19"></app-icon>导出并分享课表
+          </button>
+          <button type="button" class="secondary-button" @click="chooseScheduleFile">
+            <app-icon name="FileUp" :size="19"></app-icon>从手机导入课表文件
+          </button>
+          <input ref="scheduleImportInput" class="visually-hidden" type="file" accept=".kexu,.json,application/json" @change="importScheduleFile">
+        </div>
+        <div class="transfer-note">
+          <app-icon name="ShieldCheck" :size="18"></app-icon>
+          <p>文件仅包含课程、学期和课时设置，不含学号、密码或成绩。导入会替换当前课表，并自动将原课表保存到同步记录。</p>
         </div>
       </section>
     </div>

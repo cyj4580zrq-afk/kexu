@@ -9,7 +9,7 @@ const GRADE_URL = `${SCHOOL_BASE}/cjcx/cjcx_cxXsgrcj.html?doType=query`;
 const GRADE_REFERER = `${SCHOOL_BASE}/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005`;
 const GRADE_DETAIL_URL = "http://jw.whcibe.com/cjcx/cjcx_cxCjxqGjh.html";
 const GRADE_DETAIL_REFERER = "http://jw.whcibe.com/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005&layout=default";
-const APP_VERSION = "0.9.8-stable";
+const APP_VERSION = "0.9.9-beta";
 const STORAGE = {
   courses: "campusflow-courses",
   history: "campusflow-sync-history",
@@ -218,6 +218,7 @@ createApp({
       semesterWheelYear: Number(String(semester).split("-")[0]) || currentAcademicYearStart(),
       semesterWheelTerm: Number(String(semester).split("-")[2]) || 1,
       semesterWheelScrollTimer: null,
+      transferVisible: false,
       privacyVisible: false,
       detailVisible: false,
       gradeDetailVisible: false,
@@ -591,6 +592,10 @@ createApp({
       }
       if (this.addVisible) {
         this.addVisible = false;
+        return;
+      }
+      if (this.transferVisible) {
+        this.transferVisible = false;
         return;
       }
       if (this.semesterSheetVisible) {
@@ -1304,6 +1309,137 @@ createApp({
     persistCourses() {
       localStorage.setItem(STORAGE.courses, JSON.stringify(this.courses));
       this.database?.saveCourses(this.courses).catch(error => console.warn("课程写入 SQLite 失败", error));
+    },
+    scheduleExportPayload() {
+      const courses = this.courses.map(course => ({
+        name: String(course.name || "").trim(),
+        day: String(course.day || "").trim(),
+        time: String(course.time || "").trim(),
+        location: String(course.location || "").trim(),
+        teacher: String(course.teacher || "").trim(),
+        weekRange: String(course.weekRange || "").trim(),
+        note: String(course.note || "").trim(),
+        source: String(course.source || "shared").trim()
+      }));
+      return {
+        format: "kexu.schedule",
+        schemaVersion: 1,
+        appVersion: APP_VERSION,
+        exportedAt: new Date().toISOString(),
+        semester: this.syncForm.semester,
+        settings: {
+          currentWeek: this.currentWeek,
+          periodDuration: this.periodDuration,
+          semesterStartDate: this.semesterStartDate
+        },
+        courses
+      };
+    },
+    async exportScheduleFile() {
+      if (!this.courses.length) {
+        this.notify("当前没有可导出的课程", "warning");
+        return;
+      }
+      const payload = this.scheduleExportPayload();
+      const content = JSON.stringify(payload, null, 2);
+      const date = new Date().toISOString().slice(0, 10);
+      const filename = `课序课表_${payload.semester}_${date}.kexu`;
+      const file = new File([content], filename, { type: "application/json" });
+      try {
+        if (navigator.share && navigator.canShare?.({ files: [file] })) {
+          await navigator.share({
+            title: "课序课表",
+            text: `${payload.semester} · ${payload.courses.length} 门课程`,
+            files: [file]
+          });
+          this.notify("课表文件已分享");
+          return;
+        }
+      } catch (error) {
+        if (error?.name === "AbortError") return;
+        console.warn("系统分享不可用，改用文件下载", error);
+      }
+      const url = URL.createObjectURL(file);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.style.display = "none";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      this.notify("课表文件已导出");
+    },
+    chooseScheduleFile() {
+      this.$refs.scheduleImportInput?.click();
+    },
+    sanitizeImportedCourses(courses) {
+      if (!Array.isArray(courses) || courses.length > 300) return [];
+      const now = Date.now();
+      return courses
+        .map((course, index) => ({
+          id: now + index,
+          name: String(course?.name || "").trim().slice(0, 80),
+          day: String(course?.day || "").trim(),
+          time: String(course?.time || "").trim().slice(0, 40),
+          location: String(course?.location || "地点待定").trim().slice(0, 100),
+          teacher: String(course?.teacher || "教师待定").trim().slice(0, 60),
+          weekRange: String(course?.weekRange || "未知周次").trim().slice(0, 120),
+          note: String(course?.note || "从课序课表文件导入").trim().slice(0, 160),
+          source: "kexu-share"
+        }))
+        .filter(course => course.name && WEEK_DAYS.includes(course.day) && course.time);
+    },
+    async importScheduleFile(event) {
+      const input = event.target;
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        if (file.size > 2 * 1024 * 1024) throw new Error("课表文件不能超过 2 MB");
+        const payload = JSON.parse(await file.text());
+        if (payload?.format !== "kexu.schedule" || Number(payload.schemaVersion) !== 1) {
+          throw new Error("这不是有效的课序课表文件");
+        }
+        const courses = this.sanitizeImportedCourses(payload.courses);
+        if (!courses.length || courses.length !== payload.courses.length) {
+          throw new Error("课表文件中的课程数据不完整");
+        }
+        const semester = /^\d{4}-\d{4}-[12]$/.test(String(payload.semester || ""))
+          ? String(payload.semester)
+          : this.syncForm.semester;
+        if (!window.confirm(`导入“${semester}”的 ${courses.length} 门课程？当前课表将自动备份后被替换。`)) return;
+
+        if (this.courses.length) this.saveSnapshot("文件导入前自动备份", this.syncForm.semester, this.courses);
+        this.courses = courses;
+        this.syncForm.semester = semester;
+        localStorage.setItem(STORAGE.semester, semester);
+
+        const settings = payload.settings || {};
+        const importedWeek = Number(settings.currentWeek);
+        if (Number.isInteger(importedWeek) && importedWeek >= 1 && importedWeek <= 30) {
+          this.currentWeek = importedWeek;
+          this.selectedWeek = importedWeek;
+          localStorage.setItem(STORAGE.currentWeek, String(importedWeek));
+          localStorage.setItem(STORAGE.selectedWeek, String(importedWeek));
+        }
+        const importedDuration = Number(settings.periodDuration);
+        if (Number.isInteger(importedDuration) && importedDuration >= 30 && importedDuration <= 60) {
+          this.periodDuration = importedDuration;
+        }
+        if (/^\d{4}-\d{2}-\d{2}$/.test(String(settings.semesterStartDate || ""))) {
+          this.semesterStartDate = settings.semesterStartDate;
+        }
+
+        this.persistCourses();
+        this.saveSnapshot("课序文件导入", semester, courses);
+        this.transferVisible = false;
+        this.activeTab = "schedule";
+        this.notify(`已离线导入 ${courses.length} 门课程`);
+      } catch (error) {
+        this.notify(error.message || "课表文件读取失败", "error");
+      } finally {
+        input.value = "";
+      }
     },
     saveSnapshot(source, semester, courses) {
       this.syncHistory.unshift({
