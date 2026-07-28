@@ -1,4 +1,4 @@
-const CACHE_NAME = "kexu-web-0.9.6";
+const CACHE_NAME = "kexu-web-0.9.6-ios-fix-1";
 const STATIC_ASSETS = [
   "./",
   "./index.html",
@@ -8,8 +8,6 @@ const STATIC_ASSETS = [
   "./manifest.webmanifest",
   "./icons/icon-192.png",
   "./vendor/vue.global.prod.js",
-  "./vendor/element-plus.full.min.js",
-  "./vendor/element-plus.css",
   "./vendor/capacitor.js",
   "./vendor/jsencrypt.min.js",
   "./vendor/lucide.min.js"

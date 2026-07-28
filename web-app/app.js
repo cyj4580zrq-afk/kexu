@@ -880,7 +880,17 @@ createApp({
       this.pullOffset = 0;
     },
     notify(message, type = "success") {
-      ElementPlus.ElMessage({ message, type, duration: 2800, grouping: true });
+      document.querySelectorAll(".kexu-toast").forEach(toast => toast.remove());
+      const toast = document.createElement("div");
+      toast.className = `kexu-toast type-${type}`;
+      toast.setAttribute("role", type === "error" ? "alert" : "status");
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.add("visible"));
+      window.setTimeout(() => {
+        toast.classList.remove("visible");
+        window.setTimeout(() => toast.remove(), 220);
+      }, 2800);
     },
     async openFeedbackGroup() {
       const groupNumber = "1075730072";
@@ -1634,4 +1644,7 @@ createApp({
       }).format(date);
     }
   }
-}).use(ElementPlus).mount("#app");
+}).mount("#app");
+
+window.clearTimeout(window.__kexuBootTimer);
+document.documentElement.classList.add("app-ready");

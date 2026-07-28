@@ -11,10 +11,15 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icons/icon-192.png" type="image/png">
   <link rel="apple-touch-icon" href="./icons/icon-192.png">
-  <link rel="stylesheet" href="./vendor/element-plus.css">
   <link rel="stylesheet" href="./app.css">
 </head>
 <body>
+  <div id="boot-screen" class="boot-screen" role="status" aria-live="polite">
+    <img src="./icons/icon-192.png" alt="">
+    <strong>课序</strong>
+    <span id="boot-message">正在启动...</span>
+  </div>
+
   <div id="app" v-cloak>
     <main
       class="app-shell"
@@ -692,11 +697,18 @@
   </div>
 
   <script src="./vendor/vue.global.prod.js"></script>
-  <script src="./vendor/element-plus.full.min.js"></script>
   <script src="./vendor/capacitor.js"></script>
   <script src="./vendor/jsencrypt.min.js"></script>
   <script src="./vendor/lucide.min.js"></script>
   <script src="./local-db.js"></script>
+  <script>
+    window.__kexuBootTimer = window.setTimeout(() => {
+      const message = document.getElementById("boot-message");
+      if (message && !document.documentElement.classList.contains("app-ready")) {
+        message.textContent = "启动时间较长，请刷新页面或使用 Safari 打开";
+      }
+    }, 12000);
+  </script>
   <script src="./app.js"></script>
   <script>
     if ("serviceWorker" in navigator) {

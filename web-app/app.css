@@ -69,18 +69,69 @@ body.dark {
 button, input, select, textarea { font: inherit; }
 button { color: inherit; }
 button, select { -webkit-tap-highlight-color: transparent; }
-[v-cloak] { display: none; }
+[v-cloak] { display: none !important; }
 
-/* Element Plus defaults target desktop widths; keep notices inside small Android screens. */
-.el-message {
-  top: max(12px, calc(var(--safe-top) + 12px)) !important;
-  width: min(calc(100vw - 28px), 430px) !important;
-  min-width: 0 !important;
-  max-width: calc(100vw - 28px) !important;
-  padding: 11px 13px !important;
-  border-radius: 10px !important;
+.boot-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  color: #111827;
+  background: #f6f7f9;
+  text-align: center;
+  transition: opacity .2s ease, visibility .2s ease;
 }
-.el-message__content { min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 1.42; }
+.boot-screen img {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(22, 93, 255, .16);
+}
+.boot-screen strong { font-size: 22px; }
+.boot-screen span { max-width: 280px; color: #7b8494; font-size: 14px; line-height: 1.5; }
+.app-ready .boot-screen { opacity: 0; visibility: hidden; pointer-events: none; }
+
+.kexu-toast {
+  position: fixed;
+  z-index: 10020;
+  top: max(12px, calc(var(--safe-top) + 12px));
+  left: 50%;
+  width: min(calc(100vw - 28px), 430px);
+  padding: 12px 14px;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, .72);
+  border-radius: 12px;
+  color: #263043;
+  background: rgba(255, 255, 255, .92);
+  box-shadow: 0 12px 36px rgba(15, 23, 42, .16);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  font-size: 14px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  opacity: 0;
+  transform: translate(-50%, -10px);
+  transition: opacity .2s ease, transform .2s ease;
+}
+.kexu-toast.visible { opacity: 1; transform: translate(-50%, 0); }
+.kexu-toast.type-success { color: #137a52; }
+.kexu-toast.type-warning { color: #9a6800; }
+.kexu-toast.type-error { color: #b42318; }
+
+@media (prefers-color-scheme: dark) {
+  .boot-screen { color: #f7f8fb; background: #0c1017; }
+  .boot-screen span { color: #98a2b3; }
+  .kexu-toast {
+    border-color: rgba(255, 255, 255, .12);
+    color: #f1f5f9;
+    background: rgba(25, 31, 43, .92);
+  }
+}
 
 .app-shell { width: 100%; max-width: 680px; min-height: 100vh; margin: 0 auto; transition: transform .52s cubic-bezier(.22, 1.45, .36, 1); will-change: transform; }
 .app-shell.bouncing { transition: none; }
