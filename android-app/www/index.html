@@ -247,7 +247,7 @@
           </div>
 
           <label class="field-label">学期</label>
-          <button type="button" class="input-shell semester-trigger" @click="semesterSheetTarget = 'course'; semesterSheetVisible = true">
+          <button type="button" class="input-shell semester-trigger" @click="openSemesterSheet('course')">
             <app-icon name="CalendarRange" :size="19"></app-icon>
             <span>{{ selectedSemesterLabel }}</span>
             <app-icon name="ChevronDown" :size="17"></app-icon>
@@ -552,10 +552,10 @@
       <section class="bottom-sheet semester-sheet" role="dialog" aria-modal="true" aria-labelledby="semester-title">
         <div class="sheet-handle"></div>
         <header>
-          <div><h2 id="semester-title">{{ semesterSheetTarget === 'grade' ? '查询成绩学期' : '选择学期' }}</h2><p>{{ semesterSheetTarget === 'grade' ? '查询并保存对应学期的成绩' : '同步对应学年的教务课表' }}</p></div>
+          <div><h2 id="semester-title">{{ semesterSheetTarget === 'grade' ? '查询成绩学期' : '选择课表学期' }}</h2><p>{{ semesterRangeLabel }}</p></div>
           <button type="button" aria-label="关闭" @click="semesterSheetVisible = false"><app-icon name="X" :size="21"></app-icon></button>
         </header>
-        <div class="semester-list">
+        <div ref="semesterList" class="semester-list">
           <button
             v-for="semester in semesterOptions"
             :key="semester.value"
@@ -564,7 +564,10 @@
             @click="selectSemester(semester.value)"
           >
             <span class="semester-number">{{ semester.value.endsWith('-1') ? '1' : '2' }}</span>
-            <span class="semester-copy"><strong>{{ semester.label.split(' 学年')[0] }}</strong><small>{{ semester.value.endsWith('-1') ? '第一学期' : '第二学期' }}</small></span>
+            <span class="semester-copy">
+              <strong>{{ semester.startYear }}—{{ semester.startYear + 1 }}</strong>
+              <small>{{ semester.term === 1 ? '第一学期' : '第二学期' }}<em v-if="semester.value === currentSemesterValue">当前学期</em></small>
+            </span>
             <span class="semester-check"><app-icon v-if="(semesterSheetTarget === 'grade' ? gradeForm.semester : syncForm.semester) === semester.value" name="Check" :size="16"></app-icon></span>
           </button>
         </div>
@@ -614,7 +617,7 @@
           <label class="field-label" for="grade-student-password">教务系统密码</label>
           <div class="input-shell"><app-icon name="LockKeyhole" :size="19"></app-icon><input id="grade-student-password" v-model="gradeForm.password" :type="showPassword ? 'text' : 'password'" autocomplete="current-password" placeholder="请输入密码"><button type="button" class="input-icon" :aria-label="showPassword ? '隐藏密码' : '显示密码'" @click="showPassword = !showPassword"><app-icon :name="showPassword ? 'EyeOff' : 'Eye'" :size="19"></app-icon></button></div>
           <label class="field-label">查询学期</label>
-          <button type="button" class="input-shell semester-trigger" @click="semesterSheetTarget = 'grade'; semesterSheetVisible = true"><app-icon name="CalendarRange" :size="19"></app-icon><span>{{ selectedGradeSemesterLabel }}</span><app-icon name="ChevronDown" :size="17"></app-icon></button>
+          <button type="button" class="input-shell semester-trigger" @click="openSemesterSheet('grade')"><app-icon name="CalendarRange" :size="19"></app-icon><span>{{ selectedGradeSemesterLabel }}</span><app-icon name="ChevronDown" :size="17"></app-icon></button>
           <button class="primary-button" type="submit" :disabled="gradeLoading"><app-icon :name="gradeLoading ? 'LoaderCircle' : 'Search'" :size="20" :class="{ spinning: gradeLoading }"></app-icon>{{ gradeLoading ? gradeStep : '查询并保存本学期成绩' }}</button>
         </form>
       </section>

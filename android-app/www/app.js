@@ -81,6 +81,11 @@ function defaultSemester() {
   return `${year - 1}-${year}-2`;
 }
 
+function currentAcademicYearStart(date = new Date()) {
+  const year = date.getFullYear();
+  return date.getMonth() + 1 >= 8 ? year : year - 1;
+}
+
 function clockToMinutes(value) {
   const [hours, minutes] = value.split(":").map(Number);
   return hours * 60 + minutes;
@@ -391,13 +396,27 @@ createApp({
       return buildSectionTimes(this.periodDuration);
     },
     semesterOptions() {
-      const currentYear = new Date().getFullYear();
-      const options = [];
-      for (let start = currentYear; start >= currentYear - 4; start -= 1) {
-        options.push({ value: `${start}-${start + 1}-1`, label: `${start}-${start + 1} 学年 第一学期` });
-        options.push({ value: `${start}-${start + 1}-2`, label: `${start}-${start + 1} 学年 第二学期` });
-      }
-      return options;
+      const currentStart = currentAcademicYearStart();
+      const startYears = new Set();
+      for (let start = currentStart + 1; start >= currentStart - 12; start -= 1) startYears.add(start);
+
+      [this.syncForm.semester, this.gradeForm.semester].forEach(value => {
+        const start = Number(String(value || "").split("-")[0]);
+        if (Number.isInteger(start) && start > 2000 && start < 2100) startYears.add(start);
+      });
+
+      return [...startYears]
+        .sort((a, b) => b - a)
+        .flatMap(start => [
+          { value: `${start}-${start + 1}-1`, label: `${start}-${start + 1} 学年 第一学期`, startYear: start, term: 1 },
+          { value: `${start}-${start + 1}-2`, label: `${start}-${start + 1} 学年 第二学期`, startYear: start, term: 2 }
+        ]);
+    },
+    semesterRangeLabel() {
+      return `${this.semesterOptions.length} 个学期 · 上下滑动选择`;
+    },
+    currentSemesterValue() {
+      return defaultSemester();
     },
     selectedSemesterLabel() {
       const selected = this.semesterOptions.find(option => option.value === this.syncForm.semester);
@@ -1393,6 +1412,16 @@ createApp({
     shortLocation(value) {
       const text = String(value || "地点待定").trim();
       return text.length > 12 ? `${text.slice(0, 12)}…` : text;
+    },
+    openSemesterSheet(target) {
+      this.semesterSheetTarget = target;
+      this.semesterSheetVisible = true;
+      this.$nextTick(() => {
+        const list = this.$refs.semesterList;
+        const active = list && list.querySelector(".semester-option.active");
+        if (!list || !active) return;
+        list.scrollTop = Math.max(0, active.offsetTop - (list.clientHeight - active.offsetHeight) / 2);
+      });
     },
     selectSemester(value) {
       if (this.semesterSheetTarget === "grade") this.gradeForm.semester = value;

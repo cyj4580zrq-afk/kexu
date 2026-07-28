@@ -502,14 +502,27 @@ body.dark .focus-topline em { background: rgba(0,0,0,.07); }
 .semester-sheet { max-height: calc(84vh - var(--safe-top)); }
 .grade-sync-sheet { max-height: calc(86svh - var(--safe-top)); }
 .semester-sheet header { align-items: flex-start; }
-.semester-list { display: grid; gap: 7px; }
-.semester-option { display: grid; grid-template-columns: 38px minmax(0,1fr) 24px; min-height: 62px; align-items: center; gap: 11px; padding: 8px 12px; text-align: left; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.semester-list {
+  display: grid;
+  max-height: min(56svh, 480px);
+  gap: 7px;
+  padding: 4px 2px 18px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  scroll-snap-type: y proximity;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.semester-list::-webkit-scrollbar { display: none; }
+.semester-option { display: grid; grid-template-columns: 38px minmax(0,1fr) 24px; min-height: 62px; align-items: center; gap: 11px; padding: 8px 12px; scroll-snap-align: center; text-align: left; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
 .semester-option.active { border-color: var(--blue); background: var(--blue-soft); }
 .semester-number { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 7px; background: var(--surface-muted); color: var(--muted); font-size: 14px; font-weight: 800; }
 .semester-option.active .semester-number { background: var(--blue); color: #fff; }
 .semester-copy { display: grid; gap: 4px; }
 .semester-copy strong { font-size: 14px; }
-.semester-copy small { color: var(--muted); font-size: 11px; }
+.semester-copy small { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; }
+.semester-copy small em { padding: 2px 5px; border-radius: 4px; background: var(--blue-soft); color: var(--blue); font-size: 9px; font-style: normal; font-weight: 750; }
 .semester-check { display: grid; width: 22px; height: 22px; place-items: center; border: 1.5px solid var(--line); border-radius: 50%; color: #fff; }
 .semester-option.active .semester-check { border-color: var(--blue); background: var(--blue); }
 
