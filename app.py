@@ -2,25 +2,35 @@ import base64
 import binascii
 import os
 import re
+import threading
 import time
+from collections import defaultdict, deque
 from pathlib import Path
 
 import requests
 from bs4 import BeautifulSoup
 from Crypto.Cipher import PKCS1_v1_5
 from Crypto.PublicKey import RSA
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 
 BASE_DIR = Path(__file__).resolve().parent
+WEB_DIR = BASE_DIR / "web-app"
 WHCIBE_BASE_URL = "https://jw.whcibe.com"
 LOGIN_URL = f"{WHCIBE_BASE_URL}/xtgl/login_slogin.html"
 PUBKEY_URL = f"{WHCIBE_BASE_URL}/xtgl/login_getPublicKey.html"
 SCHEDULE_URL = f"{WHCIBE_BASE_URL}/kbcx/xskbcx_cxXsKb.html?gnmkdm=N2151"
+GRADE_URL = f"{WHCIBE_BASE_URL}/cjcx/cjcx_cxXsgrcj.html?doType=query&gnmkdm=N305005"
+GRADE_REFERER = f"{WHCIBE_BASE_URL}/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005&layout=default"
+GRADE_DETAIL_URL = f"{WHCIBE_BASE_URL}/cjcx/cjcx_cxCjxqGjh.html"
 REQUEST_TIMEOUT = (8, 20)
+LOGIN_WINDOW_SECONDS = 600
+LOGIN_ATTEMPT_LIMIT = 8
+login_attempts: dict[str, deque[float]] = defaultdict(deque)
+login_attempts_lock = threading.Lock()
 
 app = FastAPI(title="CampusFlow WHCIBE Schedule API", version="2.0.0")
 
@@ -43,6 +53,19 @@ class LoginRequest(BaseModel):
 
 class ParseHTMLRequest(BaseModel):
     html: str = Field(min_length=20)
+
+
+def enforce_login_rate_limit(request: Request) -> None:
+    forwarded = request.headers.get("x-forwarded-for", "")
+    client_ip = forwarded.split(",", 1)[0].strip() or (request.client.host if request.client else "unknown")
+    now = time.monotonic()
+    with login_attempts_lock:
+        attempts = login_attempts[client_ip]
+        while attempts and now - attempts[0] > LOGIN_WINDOW_SECONDS:
+            attempts.popleft()
+        if len(attempts) >= LOGIN_ATTEMPT_LIMIT:
+            raise HTTPException(status_code=429, detail="登录请求过于频繁，请十分钟后再试")
+        attempts.append(now)
 
 
 def encrypt_password(password: str, modulus_b64: str, exponent_b64: str) -> str:
@@ -82,6 +105,105 @@ def normalize_course(item: dict, index: int) -> dict:
         "note": "同步自武汉纺织大学外经贸学院教务系统",
         "source": "whcibe",
     }
+
+
+def parse_grade_components(html: str) -> list[dict]:
+    soup = BeautifulSoup(html, "html.parser")
+    components: list[dict] = []
+    seen: set[str] = set()
+    for row in soup.select("tr"):
+        cells = [" ".join(cell.get_text(" ", strip=True).split()) for cell in row.select("th, td")]
+        if len(cells) < 3:
+            continue
+        label = re.sub(r"[【】\[\]：:]", "", cells[0]).strip()
+        if not re.search(r"平时|期中|期末|实验|作业|课堂|总评|考试", label) or label in seen:
+            continue
+        weight_match = re.search(r"\d+(?:\.\d+)?\s*%", cells[1])
+        components.append({
+            "label": label,
+            "value": cells[2],
+            "weight": weight_match.group(0).replace(" ", "") if weight_match else "",
+        })
+        seen.add(label)
+    return components
+
+
+def fetch_grade_detail(session: requests.Session, item: dict, xnm: str, xqm: str) -> list[dict]:
+    class_id = item.get("jxb_id") or item.get("jxbid")
+    if not class_id:
+        return []
+    data = {
+        "jxb_id": class_id,
+        "xnm": item.get("xnm") or xnm,
+        "xqm": item.get("xqm") or xqm,
+        "kcmc": item.get("kcmc") or "",
+    }
+    if item.get("xh_id"):
+        data["xh_id"] = item["xh_id"]
+    response = session.post(
+        GRADE_DETAIL_URL,
+        params={"time": int(time.time() * 1000), "gnmkdm": "N305005"},
+        data=data,
+        headers={
+            "Accept": "text/html, */*; q=0.01",
+            "Referer": GRADE_REFERER,
+            "X-Requested-With": "XMLHttpRequest",
+        },
+        timeout=REQUEST_TIMEOUT,
+    )
+    response.raise_for_status()
+    return parse_grade_components(response.text)
+
+
+def fetch_all_grades(session: requests.Session, xnm: str, xqm: str) -> list[dict]:
+    rows: list[dict] = []
+    seen_pages: set[str] = set()
+    page = 1
+    total: int | None = None
+    while page <= 30:
+        response = session.post(
+            GRADE_URL,
+            data={
+                "xnm": xnm,
+                "xqm": xqm,
+                "sfzgcj": "",
+                "kcbj": "",
+                "_search": "false",
+                "nd": str(int(time.time() * 1000)),
+                "queryModel.showCount": "50",
+                "queryModel.currentPage": str(page),
+                "queryModel.sortName": " ",
+                "queryModel.sortOrder": "asc",
+                "time": "1",
+            },
+            headers={
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+                "Referer": GRADE_REFERER,
+                "X-Requested-With": "XMLHttpRequest",
+            },
+            timeout=REQUEST_TIMEOUT,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        page_rows = payload.get("items") or payload.get("rows") or payload.get("data") or []
+        if not isinstance(page_rows, list):
+            raise HTTPException(status_code=502, detail="教务系统返回了无法识别的成绩数据")
+        signature = "|".join(str(item.get("key") or item.get("jxb_id") or item.get("kch") or item) for item in page_rows)
+        if signature and signature in seen_pages:
+            break
+        if signature:
+            seen_pages.add(signature)
+        rows.extend(page_rows)
+        raw_total = payload.get("records") or payload.get("totalCount") or payload.get("total")
+        if raw_total is not None:
+            try:
+                total = int(raw_total)
+            except (TypeError, ValueError):
+                total = None
+        if not page_rows or (total is not None and len(rows) >= total) or len(page_rows) < 50:
+            break
+        page += 1
+    return rows
 
 
 def extract_label(text: str, start: str, end_labels: tuple[str, ...]) -> str:
@@ -216,6 +338,23 @@ def health() -> dict:
     return {"ok": True, "school": "武汉纺织大学外经贸学院"}
 
 
+@app.get("/api/whcibe/status")
+def school_status() -> dict:
+    session = create_school_session()
+    try:
+        response = session.get(LOGIN_URL, timeout=REQUEST_TIMEOUT)
+        response.raise_for_status()
+        if "csrftoken" not in response.text:
+            raise HTTPException(status_code=503, detail="教务系统登录服务暂未开放")
+        return {"ok": True, "message": "教务系统可连接"}
+    except HTTPException:
+        raise
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=503, detail="教务系统当前无法连接") from exc
+    finally:
+        session.close()
+
+
 @app.post("/api/whcibe/parse_html")
 def parse_html(req: ParseHTMLRequest) -> dict:
     courses = parse_schedule_html(req.html)
@@ -225,7 +364,8 @@ def parse_html(req: ParseHTMLRequest) -> dict:
 
 
 @app.post("/api/whcibe/schedule")
-def get_schedule(req: LoginRequest) -> dict:
+def get_schedule(req: LoginRequest, request: Request) -> dict:
+    enforce_login_rate_limit(request)
     xnm, xqm = semester_params(req.semester)
     session = create_school_session()
     try:
@@ -265,9 +405,31 @@ def get_schedule(req: LoginRequest) -> dict:
         session.close()
 
 
-@app.get("/")
-def index() -> FileResponse:
-    return FileResponse(BASE_DIR / "index.html")
+@app.post("/api/whcibe/grades")
+def get_grades(req: LoginRequest, request: Request) -> dict:
+    enforce_login_rate_limit(request)
+    xnm, xqm = semester_params(req.semester)
+    session = create_school_session()
+    try:
+        login_to_school(session, req.username, req.password)
+        grades = fetch_all_grades(session, xnm, xqm)
+        for grade in grades:
+            try:
+                grade["components"] = fetch_grade_detail(session, grade, xnm, xqm)
+            except requests.RequestException:
+                grade["components"] = []
+        return {"code": 200, "message": "查询成功", "data": grades}
+    except HTTPException:
+        raise
+    except requests.Timeout as exc:
+        raise HTTPException(status_code=504, detail="教务系统响应超时，请稍后重试") from exc
+    except (requests.RequestException, ValueError) as exc:
+        raise HTTPException(status_code=502, detail="暂时无法读取教务成绩，请稍后重试") from exc
+    finally:
+        session.close()
+
+
+app.mount("/", StaticFiles(directory=WEB_DIR, html=True), name="web")
 
 
 if __name__ == "__main__":

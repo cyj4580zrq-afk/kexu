@@ -67,6 +67,19 @@ npm run open:ios
 
 仓库中的 `iOS Build` 工作流会在 macOS Runner 上执行无签名的模拟器编译，用于确认 Xcode 工程和 Swift Package 依赖可正常构建。该检查不会生成可安装到真机的 IPA。
 
+## iOS Web / PWA
+
+`web-app/` 是从 `v0.9.6-stable` 共用前端迁移的 iPhone 网站版本。它支持添加到主屏幕、离线查看已保存课表与成绩，并通过同源 FastAPI 代理查询 WHCIBE 课表、全部分页成绩和已开放的分项成绩。
+
+```powershell
+python -m pip install -r requirements.txt
+python app.py
+```
+
+本地访问 `http://127.0.0.1:8000/`。公开部署必须运行完整 FastAPI 服务，不能仅使用 GitHub Pages；详见 `docs/iOS-Web-PWA说明.md`。
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/cyj4580zrq-afk/kexu/tree/ios-web-v0.9.6)
+
 ## 版本发布
 
 公开版本统一使用 `vX.Y.Z` 标签。发布前必须同时完成以下调整：
