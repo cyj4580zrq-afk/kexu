@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="canvas" x1="122" y1="90" x2="902" y2="934" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset=".58" stop-color="#F9FBFF"/>
+      <stop offset="1" stop-color="#F2F6FA"/>
+    </linearGradient>
+    <linearGradient id="aurora" x1="184" y1="190" x2="830" y2="832" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#9AF1D5"/>
+      <stop offset=".45" stop-color="#76C9FF"/>
+      <stop offset="1" stop-color="#C7A9FF"/>
+    </linearGradient>
+    <radialGradient id="mintGlow" cx="0" cy="0" r="1" gradientTransform="translate(262 294) rotate(43) scale(430)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D9FFF1" stop-opacity=".92"/>
+      <stop offset="1" stop-color="#D9FFF1" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="violetGlow" cx="0" cy="0" r="1" gradientTransform="translate(774 742) rotate(-136) scale(430)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E5D5FF" stop-opacity=".9"/>
+      <stop offset="1" stop-color="#E5D5FF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="glass" x1="278" y1="220" x2="742" y2="802" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity=".72"/>
+      <stop offset=".52" stop-color="#FFFFFF" stop-opacity=".42"/>
+      <stop offset="1" stop-color="#ECF5FF" stop-opacity=".58"/>
+    </linearGradient>
+    <linearGradient id="glassStroke" x1="244" y1="198" x2="790" y2="834" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity=".98"/>
+      <stop offset=".45" stop-color="#FFFFFF" stop-opacity=".52"/>
+      <stop offset="1" stop-color="#EAF1FF" stop-opacity=".8"/>
+    </linearGradient>
+    <linearGradient id="cardMint" x1="328" y1="345" x2="697" y2="465" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F5FFFC" stop-opacity=".88"/>
+      <stop offset="1" stop-color="#CBF5E8" stop-opacity=".64"/>
+    </linearGradient>
+    <linearGradient id="cardBlue" x1="328" y1="476" x2="697" y2="596" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F5FBFF" stop-opacity=".9"/>
+      <stop offset="1" stop-color="#CBE8FF" stop-opacity=".64"/>
+    </linearGradient>
+    <linearGradient id="cardViolet" x1="328" y1="607" x2="697" y2="727" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FCF9FF" stop-opacity=".9"/>
+      <stop offset="1" stop-color="#E3D5FF" stop-opacity=".67"/>
+    </linearGradient>
+    <filter id="outerShadow" x="-25%" y="-25%" width="150%" height="170%">
+      <feDropShadow dx="0" dy="34" stdDeviation="34" flood-color="#647EA5" flood-opacity=".2"/>
+    </filter>
+    <filter id="panelShadow" x="-40%" y="-30%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="34" stdDeviation="38" flood-color="#355F91" flood-opacity=".22"/>
+      <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#FFFFFF" flood-opacity=".7"/>
+    </filter>
+    <filter id="cardShadow" x="-20%" y="-30%" width="140%" height="170%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#426287" flood-opacity=".13"/>
+    </filter>
+    <filter id="softBlur" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="34"/>
+    </filter>
+  </defs>
+
+  <rect x="18" y="18" width="988" height="988" rx="238" fill="url(#canvas)" stroke="#FFFFFF" stroke-width="12" filter="url(#outerShadow)"/>
+  <rect x="112" y="112" width="800" height="800" rx="204" fill="url(#aurora)"/>
+  <rect x="112" y="112" width="800" height="800" rx="204" fill="url(#mintGlow)"/>
+  <rect x="112" y="112" width="800" height="800" rx="204" fill="url(#violetGlow)"/>
+  <ellipse cx="324" cy="770" rx="190" ry="116" fill="#6EE6C3" fill-opacity=".34" filter="url(#softBlur)"/>
+  <ellipse cx="757" cy="273" rx="177" ry="118" fill="#9E87FF" fill-opacity=".34" filter="url(#softBlur)"/>
+
+  <g filter="url(#panelShadow)">
+    <rect x="230" y="188" width="564" height="648" rx="132" fill="url(#glass)"/>
+    <rect x="234" y="192" width="556" height="640" rx="128" fill="none" stroke="url(#glassStroke)" stroke-width="8"/>
+    <path d="M284 254c104-61 311-80 445 0" fill="none" stroke="#FFFFFF" stroke-opacity=".7" stroke-width="12" stroke-linecap="round"/>
+    <circle cx="718" cy="264" r="16" fill="#FFFFFF" fill-opacity=".82"/>
+
+    <g filter="url(#cardShadow)">
+      <rect x="302" y="332" width="420" height="118" rx="44" fill="url(#cardMint)" stroke="#FFFFFF" stroke-opacity=".72" stroke-width="4"/>
+      <rect x="302" y="463" width="420" height="118" rx="44" fill="url(#cardBlue)" stroke="#FFFFFF" stroke-opacity=".72" stroke-width="4"/>
+      <rect x="302" y="594" width="420" height="118" rx="44" fill="url(#cardViolet)" stroke="#FFFFFF" stroke-opacity=".72" stroke-width="4"/>
+    </g>
+
+    <g fill="none" stroke="#315371" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M346 369c17-8 37-8 54 0v48c-17-8-37-8-54 0v-48z"/>
+      <path d="M400 369c17-8 37-8 54 0v48c-17-8-37-8-54 0v-48z"/>
+      <circle cx="401" cy="522" r="29"/>
+      <path d="M401 505v19l13 9"/>
+      <path d="M352 633h82M352 657h64M352 681h92"/>
+    </g>
+
+    <g opacity=".54" stroke="#47647F" stroke-width="12" stroke-linecap="round">
+      <path d="M500 370h164M500 405h110"/>
+      <path d="M466 501h198M466 536h132"/>
+      <path d="M492 633h172M492 668h122"/>
+    </g>
+  </g>
+
+  <path d="M187 235c37-62 91-96 150-117" fill="none" stroke="#FFFFFF" stroke-opacity=".62" stroke-width="14" stroke-linecap="round"/>
+</svg>
