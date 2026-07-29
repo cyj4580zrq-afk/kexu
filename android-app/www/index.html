@@ -379,6 +379,34 @@
           </button>
         </div>
 
+        <div class="settings-group settings-hub">
+          <h2>设置中心</h2>
+          <button type="button" class="setting-row" @click="openTab('courseSettings')">
+            <span class="setting-icon blue"><app-icon name="SlidersHorizontal" :size="19"></app-icon></span>
+            <span><strong>课程与提醒</strong><small>教学周、课时时长和上课通知</small></span>
+            <app-icon name="ChevronRight" :size="18"></app-icon>
+          </button>
+          <button type="button" class="setting-row" @click="openTab('appearanceSettings')">
+            <span class="setting-icon violet"><app-icon name="Palette" :size="19"></app-icon></span>
+            <span><strong>外观与交互</strong><small>主题、玻璃效果和触感反馈</small></span>
+            <app-icon name="ChevronRight" :size="18"></app-icon>
+          </button>
+          <button type="button" class="setting-row" @click="openTab('dataSettings')">
+            <span class="setting-icon green"><app-icon name="Database" :size="19"></app-icon></span>
+            <span><strong>数据与关于</strong><small>数据管理、应用更新和用户反馈</small></span>
+            <app-icon name="ChevronRight" :size="18"></app-icon>
+          </button>
+        </div>
+
+        <p class="version-text">课序 0.9.9 Beta</p>
+      </section>
+
+      <section v-show="activeTab === 'courseSettings'" class="page standard-page">
+        <header class="subpage-header">
+          <button type="button" class="icon-button" aria-label="返回我的" @click="openTab('settings')"><app-icon name="ChevronLeft" :size="21"></app-icon></button>
+          <div><p class="brand-line">SCHEDULE</p><h1>课程与提醒</h1></div>
+        </header>
+
         <div class="settings-group">
           <h2>课表</h2>
           <button type="button" class="setting-row" @click="openWeekSheet('current')">
@@ -438,6 +466,13 @@
             <app-icon name="ChevronRight" :size="18"></app-icon>
           </button>
         </div>
+      </section>
+
+      <section v-show="activeTab === 'appearanceSettings'" class="page standard-page">
+        <header class="subpage-header">
+          <button type="button" class="icon-button" aria-label="返回我的" @click="openTab('settings')"><app-icon name="ChevronLeft" :size="21"></app-icon></button>
+          <div><p class="brand-line">APPEARANCE</p><h1>外观与交互</h1></div>
+        </header>
 
         <div class="settings-group">
           <h2>外观</h2>
@@ -492,6 +527,13 @@
             <label class="switch"><input v-model="hapticsEnabled" type="checkbox"><span></span></label>
           </div>
         </div>
+      </section>
+
+      <section v-show="activeTab === 'dataSettings'" class="page standard-page">
+        <header class="subpage-header">
+          <button type="button" class="icon-button" aria-label="返回我的" @click="openTab('settings')"><app-icon name="ChevronLeft" :size="21"></app-icon></button>
+          <div><p class="brand-line">MORE</p><h1>数据与关于</h1></div>
+        </header>
 
         <div class="settings-group danger-group">
           <h2>数据</h2>
@@ -537,8 +579,8 @@
     </main>
 
     <nav class="bottom-nav" aria-label="应用导航">
-      <button v-for="tab in tabs" :key="tab.value" type="button" :class="{ active: activeTab === tab.value }" @click="openTab(tab.value)">
-        <app-icon :name="tab.icon" :size="activeTab === tab.value ? 22 : 20"></app-icon>
+      <button v-for="tab in tabs" :key="tab.value" type="button" :class="{ active: activeTab === tab.value || (tab.value === 'settings' && settingsChildTabs.includes(activeTab)) }" @click="openTab(tab.value)">
+        <app-icon :name="tab.icon" :size="activeTab === tab.value || (tab.value === 'settings' && settingsChildTabs.includes(activeTab)) ? 22 : 20"></app-icon>
         <span>{{ tab.label }}</span>
       </button>
     </nav>

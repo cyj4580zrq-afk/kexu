@@ -168,6 +168,9 @@ body.dark .focus-topline em { background: rgba(0,0,0,.07); }
 }
 
 .topbar h1, .page-header h1 { margin: 0; font-size: 25px; line-height: 1.2; letter-spacing: 0; }
+.subpage-header { display: grid; grid-template-columns: 44px minmax(0,1fr); min-height: 58px; align-items: center; gap: 12px; margin-bottom: 20px; }
+.subpage-header h1 { margin: 0; font-size: 22px; line-height: 1.2; letter-spacing: 0; }
+.subpage-header .icon-button { box-shadow: none; }
 
 .icon-button {
   display: grid;
@@ -450,6 +453,7 @@ body.dark .focus-topline em { background: rgba(0,0,0,.07); }
 
 .settings-group { display: grid; gap: 8px; margin-bottom: 24px; }
 .settings-group h2 { margin: 0 0 8px 2px; color: var(--muted); font-size: 12px; font-weight: 650; }
+.settings-hub { margin-bottom: 10px; }
 .setting-row { display: grid; grid-template-columns: 38px minmax(0,1fr) auto auto; width: 100%; min-height: 68px; align-items: center; gap: 10px; padding: 10px 12px; text-align: left; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
 .setting-icon { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 7px; }
 .setting-icon.blue { color: var(--blue); background: var(--blue-soft); }

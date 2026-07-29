@@ -206,6 +206,7 @@ createApp({
         { value: "grades", label: "成绩", icon: "ChartNoAxesCombined" },
         { value: "settings", label: "我的", icon: "UserRound" }
       ],
+      settingsChildTabs: ["sync", "history", "courseSettings", "appearanceSettings", "dataSettings"],
       activeTab: "schedule",
       weekDays: WEEK_DAYS,
       selectedDay: "全部",
@@ -566,7 +567,7 @@ createApp({
       this.tapFeedback();
     },
     returnToParentTab() {
-      if (!["sync", "history"].includes(this.activeTab)) return false;
+      if (!this.settingsChildTabs.includes(this.activeTab)) return false;
       this.suppressTabTransition = true;
       this.activeTab = "settings";
       this.tapFeedback();
