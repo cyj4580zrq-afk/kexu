@@ -565,6 +565,13 @@ createApp({
       this.activeTab = "schedule";
       this.tapFeedback();
     },
+    returnToParentTab() {
+      if (!["sync", "history"].includes(this.activeTab)) return false;
+      this.suppressTabTransition = true;
+      this.activeTab = "settings";
+      this.tapFeedback();
+      return true;
+    },
     async setupNativeBackButton() {
       if (!window.Capacitor || !window.Capacitor.isNativePlatform()) return;
       this.nativeApp = window.capacitorExports.registerPlugin("App");
@@ -613,6 +620,7 @@ createApp({
         this.weekSheetVisible = false;
         return;
       }
+      if (this.returnToParentTab()) return;
       if (this.activeTab !== "schedule") {
         this.returnToHome();
         return;
