@@ -1,92 +1,101 @@
 # 课序
 
-课序是一款面向大学生的轻量课程表应用，支持 Android 与 iOS，包含移动端首页、完整周课表、课程增删、结课提示、深色模式、同步快照与武汉纺织大学外经贸学院教务系统直连同步。
+课序是一款面向大学生的无广告、纯本地课程表与成绩管理应用。`v1.0.0-stable-end` 是项目的最终功能版本，保留武汉纺织大学外经贸学院教务系统连接能力，同时让已经保存的课程、成绩和同步记录在教务系统离线时仍可查看。
 
-## 主要功能
+> 课序是非官方学生工具，与学校及教务系统开发方无隶属关系。教务接口可用性取决于学校服务状态和接口规则。
 
-- 首页展示当前或下一节课程与今日安排
-- 按教学周、星期查看完整课表
-- 已结课课程使用明显颜色标记
-- 手机端直接登录教务系统并同步课表
-- 本地保存课程及最近 20 次同步快照
-- 支持主题色、深色模式、紧凑卡片和交互动效
-- Android 返回键按页面层级返回，首页二次确认退出
+## 最终版亮点
 
-## 项目结构
+- **当天信息一眼看清**：首页展示日期、当前教学周、下一节课和今日安排。
+- **两种课表视图**：支持完整周课表和按天分组列表，课程名称、时间、地点、教师、上课周次均可查看。
+- **离线仍能使用**：课程、成绩和同步快照保存在本机；学校服务器关闭后不影响查看已有数据。
+- **课表代码迁移**：将课表导出为 `KEXU1:` 分享代码，另一台手机粘贴即可导入，无需文件、账号服务器或云端中转。
+- **课程与成绩分开操作**：导入课表只更新课表，查询成绩只保存所选学期成绩，互不干扰。
+- **无广告与克制权限**：不含广告、埋点和开发者账号系统，教务密码仅用于当次连接，不写入本地存储。
+
+## 完整功能
+
+### 首页与课表
+
+- 根据时间显示当前课程、下一节课程及当天课程数量。
+- 支持今日课程或本周课程范围切换。
+- 周课表支持 1 至 30 教学周、周一至周日和日期表头。
+- 列表视图支持“全部课程 / 周一至周日”筛选。
+- 课程详情展示教师、教室、节次、周次和结课状态。
+- 已结课课程使用独立状态与颜色提示。
+- 支持手动添加、编辑和删除课程。
+- 默认每小节 45 分钟，小课间 5 分钟，大课间 20 分钟；可调整每小节时长。
+
+### 教务同步
+
+- 通过学号、密码和学期直接连接 `jw.whcibe.com` 导入课表。
+- 学期使用“学年 + 学期”双列轮盘选择，覆盖历史学期并扩展至 `2035-2036` 学年。
+- 密码仅用于当前请求，不保存到本机。
+- 教务系统无法连接时，可使用网页源码导入作为备用方式。
+- 每次同步生成本地快照，支持查看和恢复最近记录。
+
+### 成绩
+
+- 成绩查询与课表导入完全独立。
+- 按学期查询并本地保存，已保存学期不会重复请求和重复追加。
+- 支持删除一个完整学期的数据，删除后可重新查询。
+- 展示平均成绩、课程数量、累计学分、课程成绩、绩点、教师等信息。
+- 教务系统开放明细时，展示平时成绩、期末成绩、成绩占比与总评。
+- 支持分页获取学期完整成绩，避免只读取首屏数据。
+
+### 分享、提醒与个性化
+
+- 课表分享代码包含课程、学期、当前周、每节时长和学期起始日期。
+- 分享代码不包含学号、密码或成绩；导入前自动备份原课表。
+- 支持为未来课程创建本地上课提醒，并可调整提前时间。
+- 支持系统跟随、浅色和深色主题，多种强调色及紧凑课程卡片。
+- 支持全局液态玻璃、底部导航玻璃、全透明玻璃、下拉回弹和触感反馈。
+- 四栏底部导航为“首页、课表、成绩、我的”，按屏幕宽度均匀分配。
+- “我的”按课程与提醒、外观与交互、数据与关于拆分二级页面，减少长页面拥挤。
+- 二级页面遵循移动端返回层级；首页按返回键时二次确认退出。
+
+### 更新与反馈
+
+- 启动后可静默检查 GitHub Release，发现新版本时弹出更新提示。
+- 支持在应用内下载 APK，并调用 Android 系统安装确认页。
+- QQ 反馈群：`1075730072`。
+
+## 技术结构
 
 ```text
-.
-|-- app.py                 FastAPI 教务同步服务与网页入口
-|-- index.html             桌面网页版本
-|-- requirements.txt       Python 依赖
-`-- android-app/
-    |-- www/               Android 与 iOS 共用页面和同步逻辑
-    |-- android/           Capacitor Android 原生工程
-    |-- ios/               Capacitor iOS 与 Xcode 原生工程
-    |-- package.json       前端与 Capacitor 依赖
-    `-- capacitor.config.json
+android-app/www/       Vue 3 + Element Plus 移动端界面与业务逻辑
+android-app/android/   Capacitor Android 原生壳、网络与系统能力
+android-app/ios/       Capacitor iOS 工程（保留，不作为最终版分发目标）
+app.py                 FastAPI 网页及辅助同步服务
+index.html             桌面网页版本
+design/app-icons/      应用图标设计源文件
 ```
 
-## 运行网页版本
-
-需要 Python 3.10 或更高版本。
-
-```powershell
-python -m pip install -r requirements.txt
-python app.py
-```
-
-默认访问地址为 `http://127.0.0.1:8000`。
+主要技术：Vue 3、Element Plus、Axios、Capacitor、SQLite、本地通知和 Android 原生更新桥接。
 
 ## 构建 Android
 
-需要 Node.js、JDK 21 与 Android SDK。
+需要 Node.js、JDK 21 与 Android SDK。正式发布还需要本机 `android-app/release-signing/signing.properties` 指向的签名文件。
 
 ```powershell
-cd android-app
-npm install
-node node_modules\@capacitor\cli\bin\capacitor sync android
-cd android
-.\gradlew.bat assembleDebug
-```
-
-调试 APK 会生成在 `android-app/android/app/build/outputs/apk/debug/`。
-
-## 构建 iOS
-
-iOS 需要 macOS、Xcode 16 或更高版本，以及有效的 Apple 开发者签名。Windows 可以维护和同步源码，但不能签名生成可安装 IPA。
-
-```bash
 cd android-app
 npm ci
-npm run sync:ios
-npm run open:ios
+npm run sync:android
+npm run build:apk
 ```
 
-在 Xcode 中选择 `App` Target，在 Signing & Capabilities 中选择开发团队和唯一 Bundle Identifier，然后连接 iPhone 运行，或通过 Product > Archive 创建归档并发布。
-
-仓库中的 `iOS Build` 工作流会在 macOS Runner 上执行无签名的模拟器编译，用于确认 Xcode 工程和 Swift Package 依赖可正常构建。该检查不会生成可安装到真机的 IPA。
-
-## 版本发布
-
-公开版本统一使用 `vX.Y.Z` 标签。发布前必须同时完成以下调整：
-
-1. 更新 `android-app/package.json`、`package-lock.json`、Android `build.gradle`、iOS Xcode 工程和应用内显示的版本号。
-2. 在 `CHANGELOG.md` 顶部增加对应版本及更新内容。
-3. 提交并推送代码，然后创建并推送同版本标签。
-
-```powershell
-git tag v0.4.0
-git push origin main
-git push origin v0.4.0
-```
-
-标签推送后，GitHub Actions 会自动构建 APK、创建 GitHub Release，并附上 `CHANGELOG.md` 中该版本的更新内容。版本号不一致或缺少更新日志时，发布会停止，避免生成信息不完整的安装包。
+产物位于 `android-app/android/app/build/outputs/apk/release/app-release.apk`。
 
 ## 数据与隐私
 
-教务密码仅用于当次登录请求，不会写入本地存储。课程和同步快照保存在用户设备中。教务系统不可用时，已经同步的课表仍可离线查看。
+- 教务密码不会写入本地存储。
+- 课程、成绩、同步记录和设置保存在用户设备中。
+- 课表分享代码不包含教务凭据和成绩。
+- 应用不提供云账号、广告、统计分析或后台上传服务。
+- 卸载应用或清除应用数据会删除本地记录，请先使用课表代码迁移或保留同步来源。
 
-本项目未包含任何教务账号、密码、签名密钥或本机 SDK 路径。
+## 最终版本
 
-QQ反馈群：1075730072
+最终发布标签：`v1.0.0-stable-end`
+
+该版本是课序课程表项目的功能收官版本。仓库保留用于学习、审阅与维护，但不再规划新增产品功能。

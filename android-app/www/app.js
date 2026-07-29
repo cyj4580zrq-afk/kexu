@@ -9,7 +9,7 @@ const GRADE_URL = `${SCHOOL_BASE}/cjcx/cjcx_cxXsgrcj.html?doType=query`;
 const GRADE_REFERER = `${SCHOOL_BASE}/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005`;
 const GRADE_DETAIL_URL = "http://jw.whcibe.com/cjcx/cjcx_cxCjxqGjh.html";
 const GRADE_DETAIL_REFERER = "http://jw.whcibe.com/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005&layout=default";
-const APP_VERSION = "0.9.9-beta";
+const APP_VERSION = "1.0.0-stable-end";
 const STORAGE = {
   courses: "campusflow-courses",
   history: "campusflow-sync-history",
