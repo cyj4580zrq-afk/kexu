@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <radialGradient id="bg" cx="0" cy="0" r="1" gradientTransform="translate(390 300) rotate(52) scale(790)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#263B61"/>
+      <stop offset="1" stop-color="#111827"/>
+    </radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="14" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" rx="228" fill="url(#bg)"/>
+  <circle cx="512" cy="512" r="294" fill="#FFFFFF" fill-opacity=".05" stroke="#7BB7FF" stroke-opacity=".2" stroke-width="8"/>
+  <path d="M279 581c38 138 165 239 315 225 134-12 240-113 259-241" fill="none" stroke="#4B9BFF" stroke-width="38" stroke-linecap="round"/>
+  <path d="M744 699l111-135 30 171" fill="none" stroke="#4B9BFF" stroke-width="38" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="#F8FBFF">
+    <rect x="306" y="296" width="184" height="150" rx="48"/>
+    <rect x="534" y="296" width="184" height="150" rx="48" fill-opacity=".78"/>
+    <rect x="306" y="480" width="184" height="150" rx="48" fill-opacity=".72"/>
+    <rect x="534" y="480" width="184" height="150" rx="48" fill-opacity=".94"/>
+  </g>
+  <circle cx="626" cy="371" r="26" fill="#5CE0B4" filter="url(#glow)"/>
+  <path d="M398 334v73M362 370h73" stroke="#277BF3" stroke-width="21" stroke-linecap="round"/>
+  <path d="M576 543h100" stroke="#172235" stroke-width="20" stroke-linecap="round" opacity=".8"/>
+</svg>

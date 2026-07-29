@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>课序图标候选</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#edf2f8;color:#172235;font-family:Arial,"Microsoft YaHei",sans-serif}
+    main{width:min(1100px,100%);margin:auto;padding:64px 42px 72px}
+    h1{margin:0;font-size:42px;letter-spacing:0}p{margin:10px 0 38px;color:#68778c;font-size:18px}
+    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:28px}
+    article{padding:22px;border:1px solid rgba(112,137,170,.2);border-radius:24px;background:rgba(255,255,255,.78);box-shadow:0 16px 38px rgba(34,58,91,.1)}
+    img{display:block;width:100%;border-radius:23%;box-shadow:0 12px 24px rgba(31,48,72,.14)}
+    h2{margin:20px 0 5px;font-size:20px}span{color:#7a8798;font-size:14px}
+    .dock{display:flex;gap:28px;margin-top:48px;padding:25px 30px;border-radius:32px;background:rgba(255,255,255,.62);box-shadow:0 18px 50px rgba(43,67,101,.12);backdrop-filter:blur(20px)}
+    .mini{width:72px;height:72px;border-radius:22px}
+    @media(max-width:760px){main{padding:34px 20px}.grid{grid-template-columns:repeat(2,1fr);gap:16px}article{padding:14px;border-radius:18px}h1{font-size:30px}.dock{gap:14px}.mini{width:56px;height:56px}}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>课序 App 图标候选</h1>
+    <p>四种方向均按安卓自适应图标安全区设计</p>
+    <section class="grid">
+      <article><img src="01-order-grid.svg" alt=""><h2>01 秩序方格</h2><span>清爽、直观、学生感</span></article>
+      <article><img src="02-time-orbit.svg" alt=""><h2>02 时间轨道</h2><span>深色、科技、效率感</span></article>
+      <article><img src="03-course-flow.svg" alt=""><h2>03 课程流线</h2><span>简洁、醒目、品牌感</span></article>
+      <article><img src="04-campus-stack.svg" alt=""><h2>04 校园卡片</h2><span>亲和、层次、课程感</span></article>
+    </section>
+    <div class="dock">
+      <img class="mini" src="01-order-grid.svg" alt=""><img class="mini" src="02-time-orbit.svg" alt="">
+      <img class="mini" src="03-course-flow.svg" alt=""><img class="mini" src="04-campus-stack.svg" alt="">
+    </div>
+  </main>
+</body>
+</html>
