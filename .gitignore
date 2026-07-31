@@ -1,6 +1,8 @@
 # Local and generated files
 .playwright-cli/
 output/playwright/
+output/manual-test-images/
+output/pdf/
 __pycache__/
 *.py[cod]
 *.log

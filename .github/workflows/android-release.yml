@@ -86,13 +86,16 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           APK_NAME="Kexu-Android-v${VERSION}.apk"
+          MANUAL_NAME="Kexu-User-Manual-v${VERSION}.pdf"
           cp android-app/android/app/build/outputs/apk/release/app-release.apk "$APK_NAME"
+          cp "docs/$MANUAL_NAME" "$MANUAL_NAME"
           awk -v version="$VERSION" '
             $0 ~ "^## \\[" version "\\]" { capture=1; next }
             capture && /^## \[/ { exit }
             capture { print }
           ' CHANGELOG.md > release-notes.md
           echo "APK_NAME=$APK_NAME" >> "$GITHUB_ENV"
+          echo "MANUAL_NAME=$MANUAL_NAME" >> "$GITHUB_ENV"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - name: Publish GitHub Release
@@ -100,7 +103,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          gh release create "$GITHUB_REF_NAME" "$APK_NAME" \
+          gh release create "$GITHUB_REF_NAME" "$APK_NAME" "$MANUAL_NAME" \
             --repo "$GITHUB_REPOSITORY" \
             --title "课序 v${VERSION}" \
             --notes-file release-notes.md \

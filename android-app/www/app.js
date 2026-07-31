@@ -9,7 +9,7 @@ const GRADE_URL = `${SCHOOL_BASE}/cjcx/cjcx_cxXsgrcj.html?doType=query`;
 const GRADE_REFERER = `${SCHOOL_BASE}/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005`;
 const GRADE_DETAIL_URL = "http://jw.whcibe.com/cjcx/cjcx_cxCjxqGjh.html";
 const GRADE_DETAIL_REFERER = "http://jw.whcibe.com/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005&layout=default";
-const APP_VERSION = "1.0.0-stable-end";
+const APP_VERSION = "1.0.2-stable-end2";
 const STORAGE = {
   courses: "campusflow-courses",
   history: "campusflow-sync-history",
@@ -33,6 +33,7 @@ const STORAGE = {
   reminderEnabled: "campusflow-reminder-enabled",
   reminderMinutes: "campusflow-reminder-minutes",
   semesterStartDate: "campusflow-semester-start-date",
+  countdowns: "campusflow-countdowns",
   username: "campusflow-school-username",
   semester: "campusflow-school-semester",
   privacyConsent: "campusflow-privacy-consent"
@@ -128,6 +129,13 @@ function readJson(key, fallback) {
   }
 }
 
+function localDate(value) {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 function bytesFromBase64(value) {
   const binary = atob(String(value).replace(/\s/g, ""));
   return Uint8Array.from(binary, char => char.charCodeAt(0));
@@ -206,7 +214,7 @@ createApp({
         { value: "grades", label: "成绩", icon: "ChartNoAxesCombined" },
         { value: "settings", label: "我的", icon: "UserRound" }
       ],
-      settingsChildTabs: ["sync", "history", "courseSettings", "appearanceSettings", "dataSettings"],
+      settingsChildTabs: ["sync", "history", "countdowns", "courseSettings", "appearanceSettings", "dataSettings"],
       activeTab: "schedule",
       weekDays: WEEK_DAYS,
       selectedDay: "全部",
@@ -252,6 +260,17 @@ createApp({
       reminderEnabled: localStorage.getItem(STORAGE.reminderEnabled) === "true",
       reminderMinutes: Math.min(30, Math.max(5, Number(localStorage.getItem(STORAGE.reminderMinutes)) || 10)),
       semesterStartDate: localStorage.getItem(STORAGE.semesterStartDate) || "",
+      countdowns: readJson(STORAGE.countdowns, []),
+      countdownEditorVisible: false,
+      countdownEditingId: null,
+      countdownForm: {
+        title: "",
+        targetDate: "",
+        note: "",
+        color: "#2577f5"
+      },
+      countdownNow: Date.now(),
+      countdownTimer: null,
       pullStartY: null,
       pullOffset: 0,
       exitConfirmVisible: false,
@@ -361,6 +380,24 @@ createApp({
       if (this.focusCourse.day === this.todayLabel && range && minutes >= range.start && minutes <= range.end) return "正在上课";
       if (this.focusCourse.day === this.todayLabel && range && minutes < range.start) return "下一节课";
       return "本周课程";
+    },
+    sortedCountdowns() {
+      const today = new Date(this.countdownNow);
+      today.setHours(0, 0, 0, 0);
+      return [...this.countdowns].sort((a, b) => {
+        const aDate = localDate(a.targetDate);
+        const bDate = localDate(b.targetDate);
+        if (!aDate && !bDate) return 0;
+        if (!aDate) return 1;
+        if (!bDate) return -1;
+        const aFuture = aDate >= today;
+        const bFuture = bDate >= today;
+        if (aFuture !== bFuture) return aFuture ? -1 : 1;
+        return aFuture ? aDate - bDate : bDate - aDate;
+      });
+    },
+    featuredCountdown() {
+      return this.sortedCountdowns[0] || null;
     },
     visibleCourses() {
       const courses = this.selectedDay === "全部"
@@ -528,6 +565,9 @@ createApp({
     this.setupNativeBackButton();
     this.initializePersistentStorage();
     this.checkSchoolStatus();
+    this.countdownTimer = setInterval(() => {
+      this.countdownNow = Date.now();
+    }, 60000);
     this.autoUpdateTimer = setTimeout(() => this.checkForUpdate({ silent: true }), 1100);
   },
   beforeUnmount() {
@@ -536,6 +576,7 @@ createApp({
     document.body.classList.remove("liquid-glass", "nav-glass", "nav-clear-glass");
     if (this.backButtonListener) this.backButtonListener.remove();
     if (this.autoUpdateTimer) clearTimeout(this.autoUpdateTimer);
+    if (this.countdownTimer) clearInterval(this.countdownTimer);
     if (this.tabTransitionTimer) clearTimeout(this.tabTransitionTimer);
     if (!this.systemThemeQuery) return;
     if (this.systemThemeQuery.removeEventListener) this.systemThemeQuery.removeEventListener("change", this.applyTheme);
@@ -609,6 +650,10 @@ createApp({
         this.transferVisible = false;
         return;
       }
+      if (this.countdownEditorVisible) {
+        this.countdownEditorVisible = false;
+        return;
+      }
       if (this.semesterSheetVisible) {
         this.semesterSheetVisible = false;
         return;
@@ -661,6 +706,98 @@ createApp({
     persistGradeHistory() {
       localStorage.setItem(STORAGE.gradeHistory, JSON.stringify(this.gradeHistory));
       this.database?.saveGradeHistory(this.gradeHistory).catch(error => console.warn("成绩快照写入 SQLite 失败", error));
+    },
+    persistCountdowns() {
+      localStorage.setItem(STORAGE.countdowns, JSON.stringify(this.countdowns));
+    },
+    countdownDays(item) {
+      const target = localDate(item?.targetDate);
+      if (!target) return null;
+      const today = new Date(this.countdownNow);
+      today.setHours(0, 0, 0, 0);
+      return Math.round((target - today) / 86400000);
+    },
+    countdownNumber(item) {
+      const days = this.countdownDays(item);
+      return days === null ? "--" : Math.abs(days);
+    },
+    countdownUnit(item) {
+      const days = this.countdownDays(item);
+      if (days === null) return "未设置";
+      if (days === 0) return "天";
+      return days > 0 ? "天" : "天前";
+    },
+    countdownStatus(item) {
+      const days = this.countdownDays(item);
+      if (days === null) return "等待设置日期";
+      if (days === 0) return "今天就是目标日";
+      return days > 0 ? `距离目标还有 ${days} 天` : `目标已过去 ${Math.abs(days)} 天`;
+    },
+    formatCountdownDate(value) {
+      const date = localDate(value);
+      if (!date) return "日期待设置";
+      return new Intl.DateTimeFormat("zh-CN", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        weekday: "short"
+      }).format(date);
+    },
+    openCountdownEditor(item = null) {
+      this.countdownEditingId = item?.id || null;
+      this.countdownForm = item ? {
+        title: item.title,
+        targetDate: item.targetDate,
+        note: item.note || "",
+        color: item.color || this.accentColor
+      } : {
+        title: "",
+        targetDate: "",
+        note: "",
+        color: this.accentColor
+      };
+      this.countdownEditorVisible = true;
+      this.tapFeedback();
+    },
+    selectCountdownTemplate(title) {
+      this.countdownForm.title = title;
+      if (!this.countdownForm.note) {
+        this.countdownForm.note = title === "考研" ? "向理想院校再近一步" : "以当年官方考试通知为准";
+      }
+      this.tapFeedback();
+    },
+    saveCountdown() {
+      const title = this.countdownForm.title.trim();
+      if (!title) {
+        this.notify("请填写目标名称", "warning");
+        return;
+      }
+      if (!localDate(this.countdownForm.targetDate)) {
+        this.notify("请选择目标日期", "warning");
+        return;
+      }
+      const record = {
+        id: this.countdownEditingId || `countdown-${Date.now()}`,
+        title: title.slice(0, 24),
+        targetDate: this.countdownForm.targetDate,
+        note: this.countdownForm.note.trim().slice(0, 48),
+        color: this.countdownForm.color || this.accentColor,
+        updatedAt: new Date().toISOString()
+      };
+      const index = this.countdowns.findIndex(item => item.id === record.id);
+      if (index >= 0) this.countdowns.splice(index, 1, record);
+      else this.countdowns.push(record);
+      this.persistCountdowns();
+      this.countdownEditorVisible = false;
+      this.notify(index >= 0 ? "倒计时已更新" : "倒计时已创建");
+      this.tapFeedback(16);
+    },
+    deleteCountdown(item) {
+      if (!window.confirm(`删除“${item.title}”倒计时吗？`)) return;
+      this.countdowns = this.countdowns.filter(countdown => countdown.id !== item.id);
+      this.persistCountdowns();
+      this.notify("倒计时已删除");
+      this.tapFeedback(16);
     },
     localNotifications() {
       if (!window.Capacitor?.isNativePlatform() || !window.capacitorExports?.registerPlugin) {

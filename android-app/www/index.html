@@ -35,6 +35,21 @@
           <span>{{ todayLabel }} · {{ todayCourses.length }} 门课</span>
         </div>
 
+        <button v-if="featuredCountdown" type="button" class="home-countdown" @click="openTab('countdowns')">
+          <span class="home-countdown-icon" :style="{ color: featuredCountdown.color, background: featuredCountdown.color + '18' }">
+            <app-icon name="Hourglass" :size="20"></app-icon>
+          </span>
+          <span class="home-countdown-copy">
+            <small>目标倒计时</small>
+            <strong>{{ featuredCountdown.title }}</strong>
+          </span>
+          <span class="home-countdown-days" :style="{ color: featuredCountdown.color }">
+            <strong>{{ countdownNumber(featuredCountdown) }}</strong>
+            <small>{{ countdownUnit(featuredCountdown) }}</small>
+          </span>
+          <app-icon name="ChevronRight" :size="17"></app-icon>
+        </button>
+
         <section v-if="focusCourse" class="focus-panel" @click="openCourse(focusCourse)">
           <div class="focus-topline">
             <span><i></i>{{ focusCourseStatus }}</span>
@@ -396,9 +411,57 @@
             <span><strong>数据与关于</strong><small>数据管理、应用更新和用户反馈</small></span>
             <app-icon name="ChevronRight" :size="18"></app-icon>
           </button>
+          <button type="button" class="setting-row" @click="openTab('countdowns')">
+            <span class="setting-icon amber"><app-icon name="Hourglass" :size="19"></app-icon></span>
+            <span><strong>目标倒计时</strong><small>{{ countdowns.length ? `已设置 ${countdowns.length} 个目标` : '考研、CET-4/6 或自定义目标' }}</small></span>
+            <app-icon name="ChevronRight" :size="18"></app-icon>
+          </button>
         </div>
 
-        <p class="version-text">课序 1.0.0 Stable End</p>
+        <p class="version-text">课序 1.0.2 Stable End 2</p>
+      </section>
+
+      <section v-show="activeTab === 'countdowns'" class="page standard-page countdown-page">
+        <header class="subpage-header">
+          <button type="button" class="icon-button" aria-label="返回我的" @click="openTab('settings')"><app-icon name="ChevronLeft" :size="21"></app-icon></button>
+          <div><p class="brand-line">COUNTDOWN</p><h1>目标倒计时</h1></div>
+          <button type="button" class="icon-button" aria-label="添加倒计时" @click="openCountdownEditor()"><app-icon name="Plus" :size="21"></app-icon></button>
+        </header>
+
+        <section v-if="featuredCountdown" class="countdown-hero" :style="{ '--countdown-color': featuredCountdown.color }">
+          <div class="countdown-hero-top">
+            <span><app-icon name="Hourglass" :size="18"></app-icon>最近目标</span>
+            <button type="button" aria-label="编辑最近目标" @click="openCountdownEditor(featuredCountdown)"><app-icon name="Pencil" :size="16"></app-icon></button>
+          </div>
+          <h2>{{ featuredCountdown.title }}</h2>
+          <div class="countdown-hero-value">
+            <strong>{{ countdownNumber(featuredCountdown) }}</strong>
+            <span>{{ countdownUnit(featuredCountdown) }}</span>
+          </div>
+          <p>{{ countdownStatus(featuredCountdown) }} · {{ formatCountdownDate(featuredCountdown.targetDate) }}</p>
+        </section>
+
+        <div v-if="sortedCountdowns.length" class="countdown-list">
+          <div class="home-section-heading countdown-list-heading">
+            <div><h2>全部目标</h2><span>按距离今天的时间排序</span></div>
+            <em>{{ countdowns.length }} 个</em>
+          </div>
+          <article v-for="item in sortedCountdowns" :key="item.id" class="countdown-row">
+            <span class="countdown-row-mark" :style="{ background: item.color }"></span>
+            <button type="button" class="countdown-row-main" @click="openCountdownEditor(item)">
+              <span><strong>{{ item.title }}</strong><small>{{ formatCountdownDate(item.targetDate) }}{{ item.note ? ` · ${item.note}` : '' }}</small></span>
+              <span class="countdown-row-days" :style="{ color: item.color }"><strong>{{ countdownNumber(item) }}</strong><small>{{ countdownUnit(item) }}</small></span>
+            </button>
+            <button type="button" class="countdown-delete" :aria-label="'删除' + item.title" @click="deleteCountdown(item)"><app-icon name="Trash2" :size="17"></app-icon></button>
+          </article>
+        </div>
+
+        <div v-else class="empty-state countdown-empty">
+          <span class="empty-icon"><app-icon name="Hourglass" :size="30"></app-icon></span>
+          <h2>给重要的日子一个位置</h2>
+          <p>记录考研、CET-4/6、考试或任何值得期待的目标</p>
+          <button class="primary-button compact" type="button" @click="openCountdownEditor()"><app-icon name="Plus" :size="18"></app-icon>创建倒计时</button>
+        </div>
       </section>
 
       <section v-show="activeTab === 'courseSettings'" class="page standard-page">
@@ -574,7 +637,7 @@
           </button>
         </div>
 
-        <p class="version-text">课序 1.0.0 Stable End</p>
+        <p class="version-text">课序 1.0.2 Stable End 2</p>
       </section>
     </main>
 
@@ -629,6 +692,33 @@
           <app-icon name="ShieldCheck" :size="18"></app-icon>
           <p>代码仅包含课程、学期和课时设置，不含学号、密码或成绩。导入会替换当前课表，并自动将原课表保存到同步记录。</p>
         </div>
+      </section>
+    </div>
+
+    <div v-if="countdownEditorVisible" class="sheet-overlay" @click.self="countdownEditorVisible = false">
+      <section class="bottom-sheet countdown-editor-sheet" role="dialog" aria-modal="true" aria-labelledby="countdown-editor-title">
+        <div class="sheet-handle"></div>
+        <header>
+          <div><h2 id="countdown-editor-title">{{ countdownEditingId ? '编辑倒计时' : '创建倒计时' }}</h2><p>日期请以当年官方通知为准</p></div>
+          <button type="button" aria-label="关闭" @click="countdownEditorVisible = false"><app-icon name="X" :size="21"></app-icon></button>
+        </header>
+        <div class="countdown-templates" aria-label="常用目标模板">
+          <button v-for="template in ['考研', 'CET-4', 'CET-6']" :key="template" type="button" :class="{ active: countdownForm.title === template }" @click="selectCountdownTemplate(template)">{{ template }}</button>
+          <button type="button" :class="{ active: countdownForm.title && !['考研', 'CET-4', 'CET-6'].includes(countdownForm.title) }" @click="countdownForm.title = ''">自定义</button>
+        </div>
+        <form class="form-stack" @submit.prevent="saveCountdown">
+          <label class="field-label" for="countdown-title">目标名称</label>
+          <div class="input-shell"><app-icon name="Flag" :size="19"></app-icon><input id="countdown-title" v-model.trim="countdownForm.title" maxlength="24" placeholder="例如：期末考试"></div>
+          <label class="field-label" for="countdown-date">目标日期</label>
+          <div class="input-shell"><app-icon name="CalendarDays" :size="19"></app-icon><input id="countdown-date" v-model="countdownForm.targetDate" type="date"></div>
+          <label class="field-label" for="countdown-note">一句话备注</label>
+          <div class="input-shell"><app-icon name="MessageSquareText" :size="19"></app-icon><input id="countdown-note" v-model.trim="countdownForm.note" maxlength="48" placeholder="例如：向理想院校再近一步"></div>
+          <label class="field-label">标记颜色</label>
+          <div class="countdown-colors" aria-label="选择倒计时颜色">
+            <button v-for="color in accentOptions" :key="color" type="button" :style="{ background: color }" :class="{ active: countdownForm.color === color }" :aria-label="'选择颜色 ' + color" @click="countdownForm.color = color"><app-icon v-if="countdownForm.color === color" name="Check" :size="14"></app-icon></button>
+          </div>
+          <button class="primary-button" type="submit"><app-icon name="Check" :size="19"></app-icon>{{ countdownEditingId ? '保存修改' : '创建倒计时' }}</button>
+        </form>
       </section>
     </div>
 
