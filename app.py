@@ -100,6 +100,10 @@ class AccountStatusRequest(BaseModel):
     status: Literal["active", "disabled"]
 
 
+class AdminPasswordChangeRequest(BaseModel):
+    new_password: str = Field(min_length=10, max_length=72)
+
+
 def enforce_login_rate_limit(request: Request) -> None:
     forwarded = request.headers.get("x-forwarded-for", "")
     client_ip = forwarded.split(",", 1)[0].strip() or (request.client.host if request.client else "unknown")
@@ -152,6 +156,23 @@ def initialize_account_database() -> None:
             )
         """)
         execute(connection, "CREATE INDEX IF NOT EXISTS idx_app_users_status ON app_users(status)")
+        execute(connection, """
+            CREATE TABLE IF NOT EXISTS app_admin_config (
+                id INTEGER PRIMARY KEY,
+                password_hash TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                CHECK (id = 1)
+            )
+        """)
+        existing_admin = execute(
+            connection, "SELECT password_hash FROM app_admin_config WHERE id = 1"
+        ).fetchone()
+        if not existing_admin and ADMIN_PASSWORD:
+            execute(
+                connection,
+                "INSERT INTO app_admin_config (id, password_hash, updated_at) VALUES (1, ?, ?)",
+                (PASSWORD_HASHER.hash(ADMIN_PASSWORD), utc_now()),
+            )
 
 
 @app.on_event("startup")
@@ -168,6 +189,10 @@ def clean_real_name(value: str) -> str:
 
 def password_is_acceptable(value: str) -> bool:
     return bool(re.search(r"[A-Za-z]", value) and re.search(r"\d", value))
+
+
+def admin_password_is_acceptable(value: str) -> bool:
+    return len(value) >= 10 and password_is_acceptable(value)
 
 
 def base64url_encode(value: bytes) -> str:
@@ -235,7 +260,16 @@ def require_admin(authorization: str | None = Header(default=None)) -> None:
         username, password = credentials.split(":", 1)
     except (ValueError, UnicodeDecodeError, binascii.Error) as exc:
         raise HTTPException(status_code=401, detail="管理员凭据无效", headers={"WWW-Authenticate": "Basic"}) from exc
-    if not (hmac.compare_digest(username, ADMIN_USERNAME) and hmac.compare_digest(password, ADMIN_PASSWORD)):
+    if not hmac.compare_digest(username, ADMIN_USERNAME):
+        raise HTTPException(status_code=401, detail="管理员凭据无效", headers={"WWW-Authenticate": "Basic"})
+    with database_connection() as connection:
+        row = execute(connection, "SELECT password_hash FROM app_admin_config WHERE id = 1").fetchone()
+    password_hash = row["password_hash"] if row else ""
+    try:
+        valid_password = bool(password_hash) and PASSWORD_HASHER.verify(password_hash, password)
+    except (InvalidHashError, VerifyMismatchError):
+        valid_password = False
+    if not valid_password:
         raise HTTPException(status_code=401, detail="管理员凭据无效", headers={"WWW-Authenticate": "Basic"})
 
 
@@ -603,6 +637,19 @@ def update_account_status(user_id: int, req: AccountStatusRequest, _admin: None 
             raise HTTPException(status_code=409, detail="已注销账号不能恢复")
         execute(connection, "UPDATE app_users SET status = ? WHERE id = ?", (req.status, user_id))
     return {"message": "账号状态已更新", "status": req.status}
+
+
+@app.post("/api/admin/password")
+def update_admin_password(req: AdminPasswordChangeRequest, _admin: None = Depends(require_admin)) -> dict:
+    if not admin_password_is_acceptable(req.new_password):
+        raise HTTPException(status_code=422, detail="新密码至少 10 位，并同时包含字母和数字")
+    with database_connection() as connection:
+        execute(
+            connection,
+            "UPDATE app_admin_config SET password_hash = ?, updated_at = ? WHERE id = 1",
+            (PASSWORD_HASHER.hash(req.new_password), utc_now()),
+        )
+    return {"message": "管理员密码已更新"}
 
 
 @app.get("/admin", response_class=HTMLResponse)
