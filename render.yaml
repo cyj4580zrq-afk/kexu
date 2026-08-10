@@ -2,11 +2,23 @@ services:
   - type: web
     name: kexu-ios-web
     runtime: python
-    plan: free
+    plan: starter
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT --workers 1
     healthCheckPath: /api/health
     autoDeploy: true
+    disk:
+      name: kexu-account-data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.4
+      - key: ACCOUNT_DB_PATH
+        value: /var/data/accounts.db
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: ADMIN_USERNAME
+        value: kexu-admin
+      - key: ADMIN_PASSWORD
+        sync: false
