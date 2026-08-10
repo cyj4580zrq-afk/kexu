@@ -12,7 +12,7 @@ import time
 from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import requests
 from argon2 import PasswordHasher
@@ -24,6 +24,9 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from psycopg import IntegrityError as PostgresIntegrityError
+from psycopg import connect as postgres_connect
+from psycopg.rows import dict_row
 from pydantic import BaseModel, Field
 
 
@@ -40,6 +43,7 @@ LOGIN_WINDOW_SECONDS = 600
 LOGIN_ATTEMPT_LIMIT = 8
 login_attempts: dict[str, deque[float]] = defaultdict(deque)
 login_attempts_lock = threading.Lock()
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 ACCOUNT_DB_PATH = Path(os.getenv("ACCOUNT_DB_PATH", BASE_DIR / "data" / "accounts.db"))
 AUTH_SECRET = os.getenv("AUTH_SECRET", "kexu-local-development-secret-change-me")
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
@@ -113,21 +117,32 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def database_connection() -> sqlite3.Connection:
+def database_connection() -> Any:
+    if DATABASE_URL:
+        return postgres_connect(DATABASE_URL, row_factory=dict_row)
     connection = sqlite3.connect(ACCOUNT_DB_PATH, timeout=10)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
     return connection
 
 
+def execute(connection: Any, statement: str, parameters: tuple = ()) -> Any:
+    if DATABASE_URL:
+        statement = statement.replace("?", "%s")
+    return connection.execute(statement, parameters)
+
+
 def initialize_account_database() -> None:
-    ACCOUNT_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    if not DATABASE_URL:
+        ACCOUNT_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with database_connection() as connection:
-        connection.execute("""
+        id_column = "BIGSERIAL PRIMARY KEY" if DATABASE_URL else "INTEGER PRIMARY KEY AUTOINCREMENT"
+        account_column = "TEXT NOT NULL UNIQUE" if DATABASE_URL else "TEXT NOT NULL COLLATE NOCASE UNIQUE"
+        execute(connection, f"""
             CREATE TABLE IF NOT EXISTS app_users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id {id_column},
                 real_name TEXT NOT NULL,
-                account TEXT NOT NULL COLLATE NOCASE UNIQUE,
+                account {account_column},
                 password_hash TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT 'active'
                     CHECK (status IN ('active', 'disabled', 'deleted')),
@@ -136,7 +151,7 @@ def initialize_account_database() -> None:
                 privacy_consented_at TEXT NOT NULL
             )
         """)
-        connection.execute("CREATE INDEX IF NOT EXISTS idx_app_users_status ON app_users(status)")
+        execute(connection, "CREATE INDEX IF NOT EXISTS idx_app_users_status ON app_users(status)")
 
 
 @app.on_event("startup")
@@ -187,7 +202,7 @@ def decode_access_token(token: str) -> int:
         raise HTTPException(status_code=401, detail="登录状态无效或已过期") from exc
 
 
-def public_user(row: sqlite3.Row) -> dict:
+def public_user(row: Any) -> dict:
     return {
         "id": row["id"],
         "realName": row["real_name"],
@@ -197,12 +212,12 @@ def public_user(row: sqlite3.Row) -> dict:
     }
 
 
-def current_account(authorization: str | None = Header(default=None)) -> sqlite3.Row:
+def current_account(authorization: str | None = Header(default=None)) -> Any:
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="请先登录课序账号")
     user_id = decode_access_token(authorization[7:].strip())
     with database_connection() as connection:
-        row = connection.execute("SELECT * FROM app_users WHERE id = ?", (user_id,)).fetchone()
+        row = execute(connection, "SELECT * FROM app_users WHERE id = ?", (user_id,)).fetchone()
     if not row or row["status"] == "deleted":
         raise HTTPException(status_code=401, detail="账号不存在或已注销")
     if row["status"] == "disabled":
@@ -500,15 +515,19 @@ def register_account(req: RegisterRequest) -> dict:
     password_hash = PASSWORD_HASHER.hash(req.password)
     try:
         with database_connection() as connection:
-            cursor = connection.execute(
-                """INSERT INTO app_users
+            statement = """INSERT INTO app_users
                    (real_name, account, password_hash, status, created_at, privacy_consented_at)
-                   VALUES (?, ?, ?, 'active', ?, ?)""",
+                   VALUES (?, ?, ?, 'active', ?, ?)"""
+            if DATABASE_URL:
+                statement += " RETURNING id"
+            cursor = execute(
+                connection,
+                statement,
                 (clean_real_name(req.real_name), account, password_hash, created_at, created_at),
             )
-            user_id = int(cursor.lastrowid)
-            row = connection.execute("SELECT * FROM app_users WHERE id = ?", (user_id,)).fetchone()
-    except sqlite3.IntegrityError as exc:
+            user_id = int(cursor.fetchone()["id"] if DATABASE_URL else cursor.lastrowid)
+            row = execute(connection, "SELECT * FROM app_users WHERE id = ?", (user_id,)).fetchone()
+    except (sqlite3.IntegrityError, PostgresIntegrityError) as exc:
         raise HTTPException(status_code=409, detail="该课序账号已被注册") from exc
     return {"message": "注册成功", "token": create_access_token(user_id), "user": public_user(row)}
 
@@ -516,8 +535,9 @@ def register_account(req: RegisterRequest) -> dict:
 @app.post("/api/auth/login")
 def login_account(req: AccountLoginRequest) -> dict:
     with database_connection() as connection:
-        row = connection.execute(
-            "SELECT * FROM app_users WHERE account = ? COLLATE NOCASE", (req.account.strip(),)
+        row = execute(
+            connection,
+            "SELECT * FROM app_users WHERE LOWER(account) = LOWER(?)", (req.account.strip(),)
         ).fetchone()
         if not row or row["status"] == "deleted":
             raise HTTPException(status_code=401, detail="账号或密码错误")
@@ -528,28 +548,30 @@ def login_account(req: AccountLoginRequest) -> dict:
         if row["status"] == "disabled":
             raise HTTPException(status_code=403, detail="账号已被停用，请联系反馈群")
         if PASSWORD_HASHER.check_needs_rehash(row["password_hash"]):
-            connection.execute(
+            execute(
+                connection,
                 "UPDATE app_users SET password_hash = ? WHERE id = ?",
                 (PASSWORD_HASHER.hash(req.password), row["id"]),
             )
-        connection.execute("UPDATE app_users SET last_login_at = ? WHERE id = ?", (utc_now(), row["id"]))
+        execute(connection, "UPDATE app_users SET last_login_at = ? WHERE id = ?", (utc_now(), row["id"]))
     return {"message": "登录成功", "token": create_access_token(row["id"]), "user": public_user(row)}
 
 
 @app.get("/api/auth/me")
-def account_profile(user: sqlite3.Row = Depends(current_account)) -> dict:
+def account_profile(user: Any = Depends(current_account)) -> dict:
     return {"user": public_user(user)}
 
 
 @app.delete("/api/auth/account")
-def delete_account(req: DeleteAccountRequest, user: sqlite3.Row = Depends(current_account)) -> dict:
+def delete_account(req: DeleteAccountRequest, user: Any = Depends(current_account)) -> dict:
     try:
         PASSWORD_HASHER.verify(user["password_hash"], req.password)
     except (VerifyMismatchError, InvalidHashError) as exc:
         raise HTTPException(status_code=401, detail="密码错误，无法注销账号") from exc
     deleted_marker = f"deleted_{user['id']}_{int(time.time())}"
     with database_connection() as connection:
-        connection.execute(
+        execute(
+            connection,
             """UPDATE app_users
                SET real_name = '已注销用户', account = ?, password_hash = '', status = 'deleted'
                WHERE id = ?""",
@@ -561,7 +583,8 @@ def delete_account(req: DeleteAccountRequest, user: sqlite3.Row = Depends(curren
 @app.get("/api/admin/users")
 def admin_users(_admin: None = Depends(require_admin)) -> dict:
     with database_connection() as connection:
-        rows = connection.execute(
+        rows = execute(
+            connection,
             "SELECT id, real_name, account, status, created_at, last_login_at FROM app_users ORDER BY id DESC"
         ).fetchall()
     counts = {"total": len(rows), "active": 0, "disabled": 0, "deleted": 0}
@@ -573,12 +596,12 @@ def admin_users(_admin: None = Depends(require_admin)) -> dict:
 @app.post("/api/admin/users/{user_id}/status")
 def update_account_status(user_id: int, req: AccountStatusRequest, _admin: None = Depends(require_admin)) -> dict:
     with database_connection() as connection:
-        row = connection.execute("SELECT status FROM app_users WHERE id = ?", (user_id,)).fetchone()
+        row = execute(connection, "SELECT status FROM app_users WHERE id = ?", (user_id,)).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="账号不存在")
         if row["status"] == "deleted":
             raise HTTPException(status_code=409, detail="已注销账号不能恢复")
-        connection.execute("UPDATE app_users SET status = ? WHERE id = ?", (req.status, user_id))
+        execute(connection, "UPDATE app_users SET status = ? WHERE id = ?", (req.status, user_id))
     return {"message": "账号状态已更新", "status": req.status}
 
 
@@ -586,7 +609,8 @@ def update_account_status(user_id: int, req: AccountStatusRequest, _admin: None 
 def admin_dashboard(_admin: None = Depends(require_admin)) -> str:
     status_text = {"active": "正常", "disabled": "停用", "deleted": "已注销"}
     with database_connection() as connection:
-        rows = connection.execute(
+        rows = execute(
+            connection,
             "SELECT id, real_name, account, status, created_at, last_login_at FROM app_users ORDER BY id DESC"
         ).fetchall()
     counts = {"active": 0, "disabled": 0, "deleted": 0}
