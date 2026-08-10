@@ -3,7 +3,9 @@
 output/playwright/
 output/manual-test-images/
 output/pdf/
+tmp/
 __pycache__/
+data/
 *.py[cod]
 *.log
 .env

@@ -10,7 +10,48 @@
 </head>
 <body>
   <div id="app" v-cloak>
+    <section v-if="!accountSessionReady" class="auth-loading" aria-live="polite">
+      <span class="auth-logo">课</span>
+      <strong>正在验证登录状态</strong>
+      <small>课序</small>
+    </section>
+
+    <section v-else-if="!accountUser" class="auth-gate">
+      <header class="auth-gate-header">
+        <span class="auth-logo">课</span>
+        <div><p>KEXU ACCOUNT</p><h1>登录后开始使用</h1></div>
+      </header>
+      <section class="auth-gate-copy">
+        <h2>你的课程，由你掌握</h2>
+        <p>注册或登录课序账号后，才可以使用课表、成绩、倒计时和全部设置。</p>
+      </section>
+      <div class="account-mode" aria-label="登录或注册">
+        <button type="button" :class="{ active: accountMode === 'login' }" @click="accountMode = 'login'">登录</button>
+        <button type="button" :class="{ active: accountMode === 'register' }" @click="accountMode = 'register'">注册</button>
+      </div>
+      <form v-if="accountMode === 'login'" class="form-stack account-form auth-gate-form" @submit.prevent="loginKexuAccount">
+        <label class="field-label" for="gate-login-account">课序账号</label>
+        <div class="input-shell"><app-icon name="UserRound" :size="19"></app-icon><input id="gate-login-account" v-model.trim="accountLoginForm.account" maxlength="24" autocomplete="username" autocapitalize="none" placeholder="输入课序账号"></div>
+        <label class="field-label" for="gate-login-password">密码</label>
+        <div class="input-shell"><app-icon name="LockKeyhole" :size="19"></app-icon><input id="gate-login-password" v-model="accountLoginForm.password" type="password" maxlength="72" autocomplete="current-password" placeholder="输入密码"></div>
+        <button class="primary-button" type="submit" :disabled="accountLoading"><app-icon name="LogIn" :size="18"></app-icon>{{ accountLoading ? '正在登录' : '登录并进入课序' }}</button>
+      </form>
+      <form v-else class="form-stack account-form auth-gate-form" @submit.prevent="registerKexuAccount">
+        <label class="field-label" for="gate-real-name">真实姓名</label>
+        <div class="input-shell"><app-icon name="ContactRound" :size="19"></app-icon><input id="gate-real-name" v-model.trim="accountRegisterForm.realName" maxlength="30" autocomplete="name" placeholder="必填，由本人如实填写"></div>
+        <p class="field-hint">姓名由用户自行填写，当前不进行学校身份核验。</p>
+        <label class="field-label" for="gate-register-account">课序账号</label>
+        <div class="input-shell"><app-icon name="AtSign" :size="19"></app-icon><input id="gate-register-account" v-model.trim="accountRegisterForm.account" maxlength="24" autocomplete="username" autocapitalize="none" placeholder="4-24 位，以字母开头"></div>
+        <label class="field-label" for="gate-register-password">密码</label>
+        <div class="input-shell"><app-icon name="LockKeyhole" :size="19"></app-icon><input id="gate-register-password" v-model="accountRegisterForm.password" type="password" maxlength="72" autocomplete="new-password" placeholder="至少 8 位，包含字母和数字"></div>
+        <label class="account-consent"><input v-model="accountPrivacyConsent" type="checkbox"><span>我同意保存姓名、课序账号、密码摘要、注册时间和账号状态。密码不会以明文保存。</span></label>
+        <button class="primary-button" type="submit" :disabled="accountLoading"><app-icon name="UserRoundPlus" :size="18"></app-icon>{{ accountLoading ? '正在注册' : '注册并进入课序' }}</button>
+      </form>
+      <div class="account-separation auth-gate-note"><app-icon name="ShieldCheck" :size="18"></app-icon><p><strong>课序账号与教务账号完全分开</strong><br>不会上传教务密码、课表或成绩。</p></div>
+    </section>
+
     <main
+      v-else
       class="app-shell"
       :class="[{ bouncing: pullOffset > 0 }, { 'tab-entering': tabTransitioning }]"
       :style="{ transform: pullOffset > 0 ? `translateY(${pullOffset}px)` : undefined }"
@@ -66,9 +107,12 @@
           </div>
         </section>
 
-        <section v-else class="focus-panel free-day">
-          <span class="free-icon"><app-icon name="Coffee" :size="25"></app-icon></span>
-          <div><p>今天没有课程</p><h2>把时间留给自己</h2></div>
+        <section v-else class="focus-panel free-day" aria-live="polite">
+          <span class="free-icon"><app-icon name="Sparkles" :size="25"></app-icon></span>
+          <div>
+            <p>{{ dailyQuote.source ? `每日一句 · ${dailyQuote.source}` : '每日一句' }}</p>
+            <h2>{{ dailyQuote.text }}</h2>
+          </div>
         </section>
 
         <div class="home-section-heading">
@@ -372,6 +416,12 @@
 
         <div class="settings-group">
           <h2>常用功能</h2>
+          <button type="button" class="setting-row" @click="openTab('account')">
+            <span class="setting-icon blue"><app-icon name="CircleUserRound" :size="19"></app-icon></span>
+            <span><strong>课序账号</strong><small>{{ accountUser ? `${accountUser.realName} · ${accountUser.account}` : '注册或登录，账号与教务系统相互独立' }}</small></span>
+            <em v-if="accountUser" class="account-state">正常</em>
+            <app-icon name="ChevronRight" :size="18"></app-icon>
+          </button>
           <button type="button" class="setting-row" @click="openTab('sync')">
             <span class="setting-icon blue"><app-icon name="RefreshCw" :size="19"></app-icon></span>
             <span><strong>导入课表</strong><small>{{ lastSyncText }}</small></span>
@@ -418,7 +468,68 @@
           </button>
         </div>
 
-        <p class="version-text">课序 1.0.2 Stable End 2</p>
+        <p class="version-text">课序 1.0.7 Beta</p>
+      </section>
+
+      <section v-show="activeTab === 'account'" class="page standard-page account-page">
+        <header class="subpage-header">
+          <button type="button" class="icon-button" aria-label="返回我的" @click="openTab('settings')"><app-icon name="ChevronLeft" :size="21"></app-icon></button>
+          <div><p class="brand-line">KEXU ACCOUNT</p><h1>课序账号</h1></div>
+        </header>
+
+        <template v-if="accountUser">
+          <section class="account-profile-card">
+            <span class="account-avatar">{{ accountUser.realName.slice(0, 1) }}</span>
+            <div><small>已登录</small><h2>{{ accountUser.realName }}</h2><p>@{{ accountUser.account }}</p></div>
+            <span class="account-active"><i></i>正常</span>
+          </section>
+          <div class="account-note"><app-icon name="ShieldCheck" :size="18"></app-icon><p>课序账号仅用于账号统计与身份登录，不会同步你的教务密码、课表或成绩。</p></div>
+          <div class="settings-group account-actions">
+            <h2>账号操作</h2>
+            <button type="button" class="setting-row" @click="logoutKexuAccount">
+              <span class="setting-icon gray"><app-icon name="LogOut" :size="19"></app-icon></span>
+              <span><strong>退出登录</strong><small>不会删除本机课程和成绩</small></span>
+              <app-icon name="ChevronRight" :size="18"></app-icon>
+            </button>
+          </div>
+          <div class="account-danger">
+            <h2>注销账号</h2>
+            <p>注销不可恢复。姓名和账号会被匿名化，本机数据不受影响。</p>
+            <div class="input-shell"><app-icon name="LockKeyhole" :size="19"></app-icon><input v-model="accountDeletePassword" type="password" maxlength="72" autocomplete="current-password" placeholder="输入课序账号密码确认"></div>
+            <button type="button" class="danger-button" :disabled="accountLoading" @click="deleteKexuAccount"><app-icon name="UserRoundX" :size="18"></app-icon>注销课序账号</button>
+          </div>
+        </template>
+
+        <template v-else>
+          <section class="account-intro">
+            <span><app-icon name="Fingerprint" :size="25"></app-icon></span>
+            <h2>一个独立、干净的课序账号</h2>
+            <p>不使用教务系统学号和密码。注册成功后立即启用，无需人工审核。</p>
+          </section>
+          <div class="account-mode" aria-label="登录或注册">
+            <button type="button" :class="{ active: accountMode === 'login' }" @click="accountMode = 'login'">登录</button>
+            <button type="button" :class="{ active: accountMode === 'register' }" @click="accountMode = 'register'">注册</button>
+          </div>
+          <form v-if="accountMode === 'login'" class="form-stack account-form" @submit.prevent="loginKexuAccount">
+            <label class="field-label" for="account-login-name">课序账号</label>
+            <div class="input-shell"><app-icon name="UserRound" :size="19"></app-icon><input id="account-login-name" v-model.trim="accountLoginForm.account" maxlength="24" autocomplete="username" autocapitalize="none" placeholder="输入课序账号"></div>
+            <label class="field-label" for="account-login-password">密码</label>
+            <div class="input-shell"><app-icon name="LockKeyhole" :size="19"></app-icon><input id="account-login-password" v-model="accountLoginForm.password" type="password" maxlength="72" autocomplete="current-password" placeholder="输入密码"></div>
+            <button class="primary-button" type="submit" :disabled="accountLoading"><app-icon name="LogIn" :size="18"></app-icon>{{ accountLoading ? '正在登录' : '登录' }}</button>
+          </form>
+          <form v-else class="form-stack account-form" @submit.prevent="registerKexuAccount">
+            <label class="field-label" for="account-real-name">真实姓名</label>
+            <div class="input-shell"><app-icon name="ContactRound" :size="19"></app-icon><input id="account-real-name" v-model.trim="accountRegisterForm.realName" maxlength="30" autocomplete="name" placeholder="必填，由本人如实填写"></div>
+            <p class="field-hint">姓名由用户自行填写，当前不进行学校身份核验。</p>
+            <label class="field-label" for="account-register-name">课序账号</label>
+            <div class="input-shell"><app-icon name="AtSign" :size="19"></app-icon><input id="account-register-name" v-model.trim="accountRegisterForm.account" maxlength="24" autocomplete="username" autocapitalize="none" placeholder="4-24 位，以字母开头"></div>
+            <label class="field-label" for="account-register-password">密码</label>
+            <div class="input-shell"><app-icon name="LockKeyhole" :size="19"></app-icon><input id="account-register-password" v-model="accountRegisterForm.password" type="password" maxlength="72" autocomplete="new-password" placeholder="至少 8 位，包含字母和数字"></div>
+            <label class="account-consent"><input v-model="accountPrivacyConsent" type="checkbox"><span>我同意保存姓名、课序账号、密码摘要、注册时间和账号状态。密码不会以明文保存。</span></label>
+            <button class="primary-button" type="submit" :disabled="accountLoading"><app-icon name="UserRoundPlus" :size="18"></app-icon>{{ accountLoading ? '正在注册' : '注册并立即启用' }}</button>
+          </form>
+          <div class="account-separation"><app-icon name="Unplug" :size="18"></app-icon><p><strong>与教务账号完全分开</strong><br>请不要把教务系统密码设置为课序密码。</p></div>
+        </template>
       </section>
 
       <section v-show="activeTab === 'countdowns'" class="page standard-page countdown-page">
@@ -637,11 +748,11 @@
           </button>
         </div>
 
-        <p class="version-text">课序 1.0.2 Stable End 2</p>
+        <p class="version-text">课序 1.0.7 Beta</p>
       </section>
     </main>
 
-    <nav class="bottom-nav" aria-label="应用导航">
+    <nav v-if="accountUser" class="bottom-nav" aria-label="应用导航">
       <button v-for="tab in tabs" :key="tab.value" type="button" :class="{ active: activeTab === tab.value || (tab.value === 'settings' && settingsChildTabs.includes(activeTab)) }" @click="openTab(tab.value)">
         <app-icon :name="tab.icon" :size="activeTab === tab.value || (tab.value === 'settings' && settingsChildTabs.includes(activeTab)) ? 22 : 20"></app-icon>
         <span>{{ tab.label }}</span>
@@ -854,11 +965,11 @@
         <div class="privacy-content">
           <p class="privacy-emphasis">课序是学生个人开发的非官方课程表工具，与学校不存在隶属或授权关系。</p>
           <h3>数据如何处理</h3>
-          <p>教务密码仅用于当次加密登录，不写入本地存储，也不会发送给开发者。学号、课表、成绩和同步快照只保存在当前设备。</p>
+          <p>教务密码仅用于当次加密登录，不写入本地存储，也不会发送给开发者。学号、课表、成绩和同步快照只保存在当前设备。若注册课序账号，账号服务会保存用户自行填写的姓名、唯一账号、不可逆密码摘要、注册时间和账号状态。</p>
           <h3>网络访问</h3>
           <p>查询由你的设备直接连接学校教务系统，只读取当前账号有权查看的本人课表或成绩。应用不批量抓取、不绕过验证码或访问控制。</p>
           <h3>第三方与删除</h3>
-          <p>应用不含广告、统计 SDK 或开发者数据服务器。可在设置中清空课程；卸载应用可删除全部本地数据。</p>
+          <p>应用不含广告或统计 SDK。可在设置中清空课程；卸载应用可删除全部本地数据。课序账号可在“我的－课序账号”中注销，注销后身份信息会被匿名化。</p>
         </div>
         <button type="button" class="primary-button privacy-confirm" @click="privacyConsent = true; privacyVisible = false">我已了解</button>
       </section>

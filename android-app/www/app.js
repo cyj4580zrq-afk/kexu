@@ -9,7 +9,8 @@ const GRADE_URL = `${SCHOOL_BASE}/cjcx/cjcx_cxXsgrcj.html?doType=query`;
 const GRADE_REFERER = `${SCHOOL_BASE}/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005`;
 const GRADE_DETAIL_URL = "http://jw.whcibe.com/cjcx/cjcx_cxCjxqGjh.html";
 const GRADE_DETAIL_REFERER = "http://jw.whcibe.com/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005&layout=default";
-const APP_VERSION = "1.0.2-stable-end2";
+const ACCOUNT_API_BASE = localStorage.getItem("kexu-account-api-base") || "https://kexu-ios-web.onrender.com";
+const APP_VERSION = "1.0.7-beta";
 const STORAGE = {
   courses: "campusflow-courses",
   history: "campusflow-sync-history",
@@ -34,6 +35,8 @@ const STORAGE = {
   reminderMinutes: "campusflow-reminder-minutes",
   semesterStartDate: "campusflow-semester-start-date",
   countdowns: "campusflow-countdowns",
+  dailyQuote: "campusflow-daily-quote",
+  accountToken: "kexu-account-token",
   username: "campusflow-school-username",
   semester: "campusflow-school-semester",
   privacyConsent: "campusflow-privacy-consent"
@@ -51,6 +54,17 @@ const COURSE_PALETTES = [
   ["#f1edff", "#6848bd", "#bca9ff"],
   ["#e9f7fa", "#19758a", "#85d2df"],
   ["#fff0f3", "#b84665", "#f3a4b8"]
+];
+
+const LOCAL_DAILY_QUOTES = [
+  "今天的努力，会在未来悄悄开花。",
+  "慢一点也没关系，只要一直向前。",
+  "把今天过好，就是最踏实的进步。",
+  "你走的每一步，都算数。",
+  "认真生活，也认真成为自己。",
+  "再坚持一下，答案正在路上。",
+  "允许普通，但别放弃成长。",
+  "去做具体的事，去爱具体的生活。"
 ];
 
 const AppIcon = {
@@ -136,6 +150,13 @@ function localDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function localDayKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function bytesFromBase64(value) {
   const binary = atob(String(value).replace(/\s/g, ""));
   return Uint8Array.from(binary, char => char.charCodeAt(0));
@@ -214,7 +235,7 @@ createApp({
         { value: "grades", label: "成绩", icon: "ChartNoAxesCombined" },
         { value: "settings", label: "我的", icon: "UserRound" }
       ],
-      settingsChildTabs: ["sync", "history", "countdowns", "courseSettings", "appearanceSettings", "dataSettings"],
+      settingsChildTabs: ["sync", "history", "countdowns", "account", "courseSettings", "appearanceSettings", "dataSettings"],
       activeTab: "schedule",
       weekDays: WEEK_DAYS,
       selectedDay: "全部",
@@ -232,6 +253,16 @@ createApp({
       transferImportCode: "",
       transferBusy: false,
       privacyVisible: false,
+      accountMode: "login",
+      accountLoading: false,
+      accountSessionReady: false,
+      appFeaturesStarted: false,
+      accountToken: localStorage.getItem(STORAGE.accountToken) || "",
+      accountUser: null,
+      accountPrivacyConsent: false,
+      accountLoginForm: { account: "", password: "" },
+      accountRegisterForm: { realName: "", account: "", password: "" },
+      accountDeletePassword: "",
       detailVisible: false,
       gradeDetailVisible: false,
       addVisible: false,
@@ -271,6 +302,10 @@ createApp({
       },
       countdownNow: Date.now(),
       countdownTimer: null,
+      dailyQuote: {
+        text: LOCAL_DAILY_QUOTES[Math.floor(Math.random() * LOCAL_DAILY_QUOTES.length)],
+        source: "课序"
+      },
       pullStartY: null,
       pullOffset: 0,
       exitConfirmVisible: false,
@@ -563,12 +598,7 @@ createApp({
     window.onNativeBackEvent = () => this.handleBackButton();
     window.onKexuUpdateEvent = payload => this.handleUpdateEvent(payload);
     this.setupNativeBackButton();
-    this.initializePersistentStorage();
-    this.checkSchoolStatus();
-    this.countdownTimer = setInterval(() => {
-      this.countdownNow = Date.now();
-    }, 60000);
-    this.autoUpdateTimer = setTimeout(() => this.checkForUpdate({ silent: true }), 1100);
+    this.restoreAccountSession();
   },
   beforeUnmount() {
     window.onNativeBackEvent = null;
@@ -583,6 +613,60 @@ createApp({
     else this.systemThemeQuery.removeListener(this.applyTheme);
   },
   methods: {
+    activateAuthenticatedApp() {
+      if (this.appFeaturesStarted || !this.accountUser) return;
+      this.appFeaturesStarted = true;
+      this.initializePersistentStorage();
+      this.checkSchoolStatus();
+      this.loadDailyQuote();
+      this.countdownTimer = setInterval(() => {
+        this.countdownNow = Date.now();
+      }, 60000);
+      this.autoUpdateTimer = setTimeout(() => this.checkForUpdate({ silent: true }), 1100);
+    },
+    deactivateAuthenticatedApp() {
+      if (this.autoUpdateTimer) clearTimeout(this.autoUpdateTimer);
+      if (this.countdownTimer) clearInterval(this.countdownTimer);
+      this.autoUpdateTimer = null;
+      this.countdownTimer = null;
+      this.appFeaturesStarted = false;
+    },
+    async loadDailyQuote() {
+      const today = localDayKey();
+      const cached = readJson(STORAGE.dailyQuote, null);
+      if (cached?.date === today && cached?.text) {
+        this.dailyQuote = { text: cached.text, source: cached.source || "" };
+        return;
+      }
+
+      const fallbackIndex = [...today].reduce((sum, char) => sum + char.charCodeAt(0), 0) % LOCAL_DAILY_QUOTES.length;
+      this.dailyQuote = { text: LOCAL_DAILY_QUOTES[fallbackIndex], source: "课序" };
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4500);
+      try {
+        const response = await fetch("https://v1.hitokoto.cn/?c=e&c=k&encode=json&charset=utf-8&min_length=6&max_length=20", {
+          method: "GET",
+          cache: "no-store",
+          signal: controller.signal
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        const text = String(data?.hitokoto || "").trim();
+        if (text.length < 4 || text.length > 28) throw new Error("每日一句长度不合适");
+        const record = {
+          date: today,
+          text,
+          source: String(data?.from || data?.from_who || "一言").trim().slice(0, 18) || "一言"
+        };
+        this.dailyQuote = { text: record.text, source: record.source };
+        localStorage.setItem(STORAGE.dailyQuote, JSON.stringify(record));
+      } catch (_error) {
+        localStorage.setItem(STORAGE.dailyQuote, JSON.stringify({ date: today, ...this.dailyQuote }));
+      } finally {
+        clearTimeout(timeout);
+      }
+    },
     playTabTransition() {
       if (this.tabTransitionTimer) clearTimeout(this.tabTransitionTimer);
       this.tabTransitioning = false;
@@ -597,6 +681,7 @@ createApp({
       });
     },
     openTab(tab) {
+      if (!this.accountUser) return;
       if (this.activeTab === tab) return;
       this.activeTab = tab;
       this.tapFeedback();
@@ -664,6 +749,11 @@ createApp({
       }
       if (this.weekSheetVisible) {
         this.weekSheetVisible = false;
+        return;
+      }
+      if (this.accountSessionReady && !this.accountUser) {
+        this.exitConfirmVisible = true;
+        this.tapFeedback(14);
         return;
       }
       if (this.returnToParentTab()) return;
@@ -1016,6 +1106,121 @@ createApp({
     },
     notify(message, type = "success") {
       ElementPlus.ElMessage({ message, type, duration: 2800, grouping: true });
+    },
+    async accountApiRequest(path, options = {}) {
+      const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+      if (this.accountToken) headers.Authorization = `Bearer ${this.accountToken}`;
+      let response;
+      try {
+        response = await fetch(`${ACCOUNT_API_BASE}${path}`, {
+          method: options.method || "GET",
+          headers,
+          body: options.body ? JSON.stringify(options.body) : undefined
+        });
+      } catch (_error) {
+        throw new Error("暂时无法连接课序账号服务，请稍后重试");
+      }
+      let payload = {};
+      try { payload = await response.json(); } catch (_error) { payload = {}; }
+      if (!response.ok) throw new Error(payload.detail || "账号服务请求失败");
+      return payload;
+    },
+    async restoreAccountSession() {
+      if (!this.accountToken) {
+        this.accountSessionReady = true;
+        return;
+      }
+      try {
+        const payload = await this.accountApiRequest("/api/auth/me");
+        this.accountUser = payload.user;
+        this.activateAuthenticatedApp();
+      } catch (_error) {
+        this.accountToken = "";
+        this.accountUser = null;
+        localStorage.removeItem(STORAGE.accountToken);
+      } finally {
+        this.accountSessionReady = true;
+      }
+    },
+    async registerKexuAccount() {
+      const form = this.accountRegisterForm;
+      if (!form.realName.trim()) return this.notify("请填写真实姓名", "warning");
+      if (!/^[A-Za-z][A-Za-z0-9_]{3,23}$/.test(form.account)) return this.notify("账号需以字母开头，可使用字母、数字和下划线", "warning");
+      if (form.password.length < 8 || !/[A-Za-z]/.test(form.password) || !/\d/.test(form.password)) return this.notify("密码至少 8 位，并包含字母和数字", "warning");
+      if (!this.accountPrivacyConsent) return this.notify("请先同意账号隐私说明", "warning");
+      this.accountLoading = true;
+      try {
+        const payload = await this.accountApiRequest("/api/auth/register", {
+          method: "POST",
+          body: {
+            real_name: form.realName.trim(),
+            account: form.account.trim(),
+            password: form.password,
+            privacy_consent: true
+          }
+        });
+        this.accountToken = payload.token;
+        this.accountUser = payload.user;
+        this.accountSessionReady = true;
+        this.activeTab = "schedule";
+        this.activateAuthenticatedApp();
+        localStorage.setItem(STORAGE.accountToken, payload.token);
+        this.accountRegisterForm.password = "";
+        this.notify("注册成功，账号已立即启用");
+      } catch (error) {
+        this.notify(error.message, "error");
+      } finally {
+        this.accountLoading = false;
+      }
+    },
+    async loginKexuAccount() {
+      if (!this.accountLoginForm.account || !this.accountLoginForm.password) return this.notify("请输入账号和密码", "warning");
+      this.accountLoading = true;
+      try {
+        const payload = await this.accountApiRequest("/api/auth/login", {
+          method: "POST",
+          body: this.accountLoginForm
+        });
+        this.accountToken = payload.token;
+        this.accountUser = payload.user;
+        this.accountSessionReady = true;
+        this.activeTab = "schedule";
+        this.activateAuthenticatedApp();
+        localStorage.setItem(STORAGE.accountToken, payload.token);
+        this.accountLoginForm.password = "";
+        this.notify("登录成功");
+      } catch (error) {
+        this.notify(error.message, "error");
+      } finally {
+        this.accountLoading = false;
+      }
+    },
+    logoutKexuAccount() {
+      this.deactivateAuthenticatedApp();
+      this.accountToken = "";
+      this.accountUser = null;
+      this.accountSessionReady = true;
+      this.activeTab = "schedule";
+      this.accountDeletePassword = "";
+      localStorage.removeItem(STORAGE.accountToken);
+      this.notify("已退出课序账号", "info");
+    },
+    async deleteKexuAccount() {
+      if (!this.accountDeletePassword) return this.notify("请输入课序账号密码", "warning");
+      if (!window.confirm("确定注销课序账号吗？注销后无法恢复，但本机课表和成绩仍会保留。")) return;
+      this.accountLoading = true;
+      try {
+        const payload = await this.accountApiRequest("/api/auth/account", {
+          method: "DELETE",
+          body: { password: this.accountDeletePassword }
+        });
+        this.logoutKexuAccount();
+        this.notify(payload.message);
+      } catch (error) {
+        this.notify(error.message, "error");
+      } finally {
+        this.accountLoading = false;
+      }
     },
     async openFeedbackGroup() {
       const groupNumber = "1075730072";
