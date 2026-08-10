@@ -1,16 +1,17 @@
 const { createApp } = Vue;
 
-const SCHOOL_BASE = "https://jw.whcibe.com";
-const LOGIN_URL = `${SCHOOL_BASE}/xtgl/login_slogin.html`;
-const PUBKEY_URL = `${SCHOOL_BASE}/xtgl/login_getPublicKey.html`;
-const SCHEDULE_URL = `${SCHOOL_BASE}/kbcx/xskbcx_cxXsKb.html?gnmkdm=N2151`;
-const SCHEDULE_REFERER = `${SCHOOL_BASE}/kbcx/xskbcx_cxXskbcxIndex.html?gnmkdm=N2151`;
-const GRADE_URL = `${SCHOOL_BASE}/cjcx/cjcx_cxXsgrcj.html?doType=query`;
-const GRADE_REFERER = `${SCHOOL_BASE}/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005`;
-const GRADE_DETAIL_URL = "http://jw.whcibe.com/cjcx/cjcx_cxCjxqGjh.html";
-const GRADE_DETAIL_REFERER = "http://jw.whcibe.com/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005&layout=default";
-const ACCOUNT_API_BASE = localStorage.getItem("kexu-account-api-base") || "https://kexu-ios-web.onrender.com";
-const APP_VERSION = "1.0.7-beta";
+const SCHOOL_PUBLIC_BASE = "https://jw.whcibe.com";
+const SCHOOL_INTRANET_BASE = "http://10.1.4.138";
+const SCHOOL_LOGIN_PATH = "/xtgl/login_slogin.html";
+const SCHOOL_PUBKEY_PATH = "/xtgl/login_getPublicKey.html";
+const SCHOOL_SCHEDULE_PATH = "/kbcx/xskbcx_cxXsKb.html?gnmkdm=N2151";
+const SCHOOL_SCHEDULE_REFERER_PATH = "/kbcx/xskbcx_cxXskbcxIndex.html?gnmkdm=N2151";
+const SCHOOL_GRADE_PATH = "/cjcx/cjcx_cxXsgrcj.html?doType=query";
+const SCHOOL_GRADE_REFERER_PATH = "/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005";
+const SCHOOL_GRADE_DETAIL_PATH = "/cjcx/cjcx_cxCjxqGjh.html";
+// Temporary Aliyun endpoint while the production HTTPS domain is being configured.
+const ACCOUNT_API_BASE = localStorage.getItem("kexu-account-api-base") || "http://47.122.105.185";
+const APP_VERSION = "2.0.0-stable";
 const STORAGE = {
   courses: "campusflow-courses",
   history: "campusflow-sync-history",
@@ -330,6 +331,8 @@ createApp({
       gradeLoading: false,
       gradeStep: "正在连接教务系统",
       schoolStatus: { type: "unknown", text: "等待连接" },
+      schoolBase: SCHOOL_PUBLIC_BASE,
+      schoolRoute: "default",
       syncForm: {
         username: localStorage.getItem(STORAGE.username) || "",
         password: "",
@@ -1252,8 +1255,8 @@ createApp({
       const request = {
         url,
         method,
-        connectTimeout: 10000,
-        readTimeout: 22000,
+        connectTimeout: options.connectTimeout || 10000,
+        readTimeout: options.readTimeout || 22000,
         responseType: options.responseType || "text",
         headers: options.headers || {},
         params: options.params,
@@ -1267,10 +1270,46 @@ createApp({
       }
       return response;
     },
+    schoolEndpoints() {
+      const base = this.schoolBase;
+      return {
+        base,
+        login: `${base}${SCHOOL_LOGIN_PATH}`,
+        publicKey: `${base}${SCHOOL_PUBKEY_PATH}`,
+        schedule: `${base}${SCHOOL_SCHEDULE_PATH}`,
+        scheduleReferer: `${base}${SCHOOL_SCHEDULE_REFERER_PATH}`,
+        grades: `${base}${SCHOOL_GRADE_PATH}`,
+        gradesReferer: `${base}${SCHOOL_GRADE_REFERER_PATH}`,
+        gradeDetail: `${base}${SCHOOL_GRADE_DETAIL_PATH}`,
+        gradeDetailReferer: `${base}${SCHOOL_GRADE_REFERER_PATH}&layout=default`
+      };
+    },
+    async selectSchoolRoute() {
+      const routes = [
+        { base: SCHOOL_INTRANET_BASE, label: "preferred" },
+        { base: SCHOOL_PUBLIC_BASE, label: "fallback" }
+      ];
+      let lastError;
+      for (const route of routes) {
+        try {
+          await this.httpRequest("GET", `${route.base}${SCHOOL_LOGIN_PATH}`, {
+            responseType: "text",
+            connectTimeout: 2800,
+            readTimeout: 4500
+          });
+          this.schoolBase = route.base;
+          this.schoolRoute = route.label;
+          this.schoolStatus = { type: "online", text: "网络已连接" };
+          return route;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      throw new Error(lastError?.message || "教务系统暂时无法连接");
+    },
     async checkSchoolStatus() {
       try {
-        await this.httpRequest("GET", LOGIN_URL, { responseType: "text" });
-        this.schoolStatus = { type: "online", text: "可连接" };
+        await this.selectSchoolRoute();
       } catch (_error) {
         this.schoolStatus = { type: "offline", text: "暂不可用" };
       }
@@ -1279,8 +1318,11 @@ createApp({
       const cookies = window.capacitorExports && window.capacitorExports.CapacitorCookies;
       if (cookies) await cookies.clearAllCookies();
 
+      setStep("正在选择教务线路");
+      await this.selectSchoolRoute();
+      const endpoints = this.schoolEndpoints();
       setStep("正在获取登录信息");
-      const loginPage = await this.httpRequest("GET", LOGIN_URL, {
+      const loginPage = await this.httpRequest("GET", endpoints.login, {
         headers: { "Accept-Language": "zh-CN,zh;q=0.9" }
       });
       const loginHtml = htmlText(loginPage);
@@ -1288,21 +1330,21 @@ createApp({
         || loginHtml.match(/value=["']([^"']+)["'][^>]*id=["']csrftoken["']/i);
       if (!csrfMatch) throw new Error("教务系统未返回登录令牌，可能正在维护");
 
-      const publicKeyResponse = await this.httpRequest("GET", PUBKEY_URL, {
+      const publicKeyResponse = await this.httpRequest("GET", endpoints.publicKey, {
         params: { time: String(Date.now()) },
-        headers: { Referer: LOGIN_URL }
+        headers: { Referer: endpoints.login }
       });
       const publicKey = responseData(publicKeyResponse);
       if (!publicKey || !publicKey.modulus || !publicKey.exponent) throw new Error("教务系统未返回密码加密公钥");
 
       setStep("正在安全登录");
       const encryptedPassword = encryptSchoolPassword(credentials.password, publicKey.modulus, publicKey.exponent);
-      const loginResponse = await this.httpRequest("POST", `${LOGIN_URL}?time=${Date.now()}`, {
+      const loginResponse = await this.httpRequest("POST", `${endpoints.login}?time=${Date.now()}`, {
         data: { csrftoken: csrfMatch[1], yhm: credentials.username, mm: encryptedPassword },
         headers: {
           "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-          Origin: SCHOOL_BASE,
-          Referer: LOGIN_URL
+          Origin: endpoints.base,
+          Referer: endpoints.login
         }
       });
       const loginResultHtml = htmlText(loginResponse);
@@ -1327,17 +1369,18 @@ createApp({
       this.schoolStatus = { type: "unknown", text: "连接中" };
       try {
         await this.authenticateSchool(this.syncForm, step => { this.syncStep = step; });
+        const endpoints = this.schoolEndpoints();
 
         this.syncStep = "正在获取课程";
         const [startYear, _endYear, term] = this.syncForm.semester.split("-");
-        const scheduleResponse = await this.httpRequest("POST", SCHEDULE_URL, {
+        const scheduleResponse = await this.httpRequest("POST", endpoints.schedule, {
           responseType: "json",
           data: { xnm: startYear, xqm: term === "1" ? "3" : "12", kzlx: "ck" },
           headers: {
             "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
             Accept: "application/json, text/javascript, */*; q=0.01",
-            Origin: SCHOOL_BASE,
-            Referer: SCHEDULE_REFERER,
+            Origin: endpoints.base,
+            Referer: endpoints.scheduleReferer,
             "X-Requested-With": "XMLHttpRequest"
           }
         });
@@ -1348,14 +1391,14 @@ createApp({
         if (newCourses.length) {
           this.courses = newCourses;
           this.persistCourses();
-          this.saveSnapshot("教务系统直接同步", this.syncForm.semester, newCourses);
+          this.saveSnapshot("教务系统同步", this.syncForm.semester, newCourses);
         }
 
         localStorage.setItem(STORAGE.username, this.syncForm.username);
         localStorage.setItem(STORAGE.semester, this.syncForm.semester);
         this.syncForm.password = "";
         this.selectedDay = "全部";
-        this.schoolStatus = { type: "online", text: "同步成功" };
+        this.schoolStatus = { type: "online", text: "网络已连接" };
         this.notify(`已同步 ${newCourses.length} 门课程`);
         this.activeTab = "schedule";
       } catch (error) {
@@ -1426,12 +1469,13 @@ createApp({
       };
     },
     async fetchSchoolGrades(startYear, term) {
+      const endpoints = this.schoolEndpoints();
       const allRows = [];
       let page = 1;
       let total = null;
       const seenPages = new Set();
       while (page <= 30) {
-        const response = await this.httpRequest("POST", GRADE_URL, {
+        const response = await this.httpRequest("POST", endpoints.grades, {
           responseType: "json",
           data: {
             xnm: startYear,
@@ -1449,8 +1493,8 @@ createApp({
           headers: {
             "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
             Accept: "application/json, text/javascript, */*; q=0.01",
-            Origin: SCHOOL_BASE,
-            Referer: GRADE_REFERER,
+            Origin: endpoints.base,
+            Referer: endpoints.gradesReferer,
             "X-Requested-With": "XMLHttpRequest"
           }
         });
@@ -1569,12 +1613,13 @@ createApp({
           kcmc: grade.remote.kcmc
         };
         if (grade.remote.xhId) detailData.xh_id = grade.remote.xhId;
-        const response = await this.httpRequest("POST", `${GRADE_DETAIL_URL}?time=${Date.now()}&gnmkdm=N305005`, {
+        const endpoints = this.schoolEndpoints();
+        const response = await this.httpRequest("POST", `${endpoints.gradeDetail}?time=${Date.now()}&gnmkdm=N305005`, {
           responseType: "text",
           data: detailData,
           headers: {
-            Referer: GRADE_DETAIL_REFERER,
-            Origin: "http://jw.whcibe.com",
+            Referer: endpoints.gradeDetailReferer,
+            Origin: endpoints.base,
             "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
             "X-Requested-With": "XMLHttpRequest"
           }
