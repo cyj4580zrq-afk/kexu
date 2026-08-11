@@ -19,35 +19,23 @@
     <section v-else-if="!accountUser" class="auth-gate">
       <header class="auth-gate-header">
         <span class="auth-logo">课</span>
-        <div><p>KEXU ACCOUNT</p><h1>登录后开始使用</h1></div>
+        <div><p>WHCIBE</p><h1>登录后开始使用</h1></div>
       </header>
       <section class="auth-gate-copy">
         <h2>你的课程，由你掌握</h2>
-        <p>注册或登录课序账号后，才可以使用课表、成绩、倒计时和全部设置。</p>
+        <p>使用教务系统学号完成首次授权后，即可使用课表、成绩、倒计时和全部设置。</p>
       </section>
-      <div class="account-mode" aria-label="登录或注册">
-        <button type="button" :class="{ active: accountMode === 'login' }" @click="accountMode = 'login'">登录</button>
-        <button type="button" :class="{ active: accountMode === 'register' }" @click="accountMode = 'register'">注册</button>
-      </div>
-      <form v-if="accountMode === 'login'" class="form-stack account-form auth-gate-form" @submit.prevent="loginKexuAccount">
-        <label class="field-label" for="gate-login-account">课序账号</label>
-        <div class="input-shell"><app-icon name="UserRound" :size="19"></app-icon><input id="gate-login-account" v-model.trim="accountLoginForm.account" maxlength="24" autocomplete="username" autocapitalize="none" placeholder="输入课序账号"></div>
-        <label class="field-label" for="gate-login-password">密码</label>
-        <div class="input-shell"><app-icon name="LockKeyhole" :size="19"></app-icon><input id="gate-login-password" v-model="accountLoginForm.password" type="password" maxlength="72" autocomplete="current-password" placeholder="输入密码"></div>
-        <button class="primary-button" type="submit" :disabled="accountLoading"><app-icon name="LogIn" :size="18"></app-icon>{{ accountLoading ? '正在登录' : '登录并进入课序' }}</button>
-      </form>
-      <form v-else class="form-stack account-form auth-gate-form" @submit.prevent="registerKexuAccount">
+      <form class="form-stack account-form auth-gate-form" @submit.prevent="createCloudIdentity">
         <label class="field-label" for="gate-real-name">真实姓名</label>
-        <div class="input-shell"><app-icon name="ContactRound" :size="19"></app-icon><input id="gate-real-name" v-model.trim="accountRegisterForm.realName" maxlength="30" autocomplete="name" placeholder="必填，由本人如实填写"></div>
-        <p class="field-hint">姓名由用户自行填写，当前不进行学校身份核验。</p>
-        <label class="field-label" for="gate-register-account">课序账号</label>
-        <div class="input-shell"><app-icon name="AtSign" :size="19"></app-icon><input id="gate-register-account" v-model.trim="accountRegisterForm.account" maxlength="24" autocomplete="username" autocapitalize="none" placeholder="4-24 位，以字母开头"></div>
-        <label class="field-label" for="gate-register-password">密码</label>
-        <div class="input-shell"><app-icon name="LockKeyhole" :size="19"></app-icon><input id="gate-register-password" v-model="accountRegisterForm.password" type="password" maxlength="72" autocomplete="new-password" placeholder="至少 8 位，包含字母和数字"></div>
-        <label class="account-consent"><input v-model="accountPrivacyConsent" type="checkbox"><span>我同意保存姓名、课序账号、密码摘要、注册时间和账号状态。密码不会以明文保存。</span></label>
-        <button class="primary-button" type="submit" :disabled="accountLoading"><app-icon name="UserRoundPlus" :size="18"></app-icon>{{ accountLoading ? '正在注册' : '注册并进入课序' }}</button>
+        <div class="input-shell"><app-icon name="ContactRound" :size="19"></app-icon><input id="gate-real-name" v-model.trim="schoolOnboardingForm.realName" maxlength="30" autocomplete="name" placeholder="必填，由本人如实填写"></div>
+        <label class="field-label" for="gate-student-id">教务系统学号</label>
+        <div class="input-shell"><app-icon name="UserRound" :size="19"></app-icon><input id="gate-student-id" v-model.trim="schoolOnboardingForm.username" maxlength="40" autocomplete="username" placeholder="请输入学号"></div>
+        <label class="field-label" for="gate-school-password">教务系统密码</label>
+        <div class="input-shell"><app-icon name="LockKeyhole" :size="19"></app-icon><input id="gate-school-password" v-model="schoolOnboardingForm.password" type="password" maxlength="128" autocomplete="current-password" placeholder="仅用于本机完成教务授权"></div>
+        <label class="account-consent"><input v-model="accountPrivacyConsent" type="checkbox"><span>我同意将姓名、学号、课表、成绩及同步时间保存至云端，用于跨设备查看和缓存同步。</span></label>
+        <button class="primary-button" type="submit" :disabled="accountLoading"><app-icon name="LogIn" :size="18"></app-icon>{{ accountLoading ? syncStep : '授权并进入课序' }}</button>
       </form>
-      <div class="account-separation auth-gate-note"><app-icon name="ShieldCheck" :size="18"></app-icon><p><strong>课序账号与教务账号完全分开</strong><br>不会上传教务密码、课表或成绩。</p></div>
+      <div class="account-separation auth-gate-note"><app-icon name="ShieldCheck" :size="18"></app-icon><p><strong>教务密码不会上传至课序服务器</strong><br>课表与成绩仅在你同意后用于云端缓存。</p></div>
     </section>
 
     <main
@@ -418,7 +406,7 @@
           <h2>常用功能</h2>
           <button type="button" class="setting-row" @click="openTab('account')">
             <span class="setting-icon blue"><app-icon name="CircleUserRound" :size="19"></app-icon></span>
-            <span><strong>课序账号</strong><small>{{ accountUser ? `${accountUser.realName} · ${accountUser.account}` : '注册或登录，账号与教务系统相互独立' }}</small></span>
+            <span><strong>云端身份</strong><small>{{ accountUser ? `${accountUser.realName} · ${accountUser.studentId}` : '用教务学号授权后自动创建' }}</small></span>
             <em v-if="accountUser" class="account-state">正常</em>
             <app-icon name="ChevronRight" :size="18"></app-icon>
           </button>
@@ -474,29 +462,28 @@
       <section v-show="activeTab === 'account'" class="page standard-page account-page">
         <header class="subpage-header">
           <button type="button" class="icon-button" aria-label="返回我的" @click="openTab('settings')"><app-icon name="ChevronLeft" :size="21"></app-icon></button>
-          <div><p class="brand-line">KEXU ACCOUNT</p><h1>课序账号</h1></div>
+          <div><p class="brand-line">CLOUD IDENTITY</p><h1>云端身份</h1></div>
         </header>
 
         <template v-if="accountUser">
           <section class="account-profile-card">
             <span class="account-avatar">{{ accountUser.realName.slice(0, 1) }}</span>
-            <div><small>已登录</small><h2>{{ accountUser.realName }}</h2><p>@{{ accountUser.account }}</p></div>
+            <div><small>已授权</small><h2>{{ accountUser.realName }}</h2><p>学号 {{ accountUser.studentId }}</p></div>
             <span class="account-active"><i></i>正常</span>
           </section>
-          <div class="account-note"><app-icon name="ShieldCheck" :size="18"></app-icon><p>课序账号仅用于账号统计与身份登录，不会同步你的教务密码、课表或成绩。</p></div>
+          <div class="account-note"><app-icon name="ShieldCheck" :size="18"></app-icon><p>教务密码不会上传或保存。你同意同步的课表与成绩会保存至云端，供本设备和后续设备读取。</p></div>
           <div class="settings-group account-actions">
             <h2>账号操作</h2>
             <button type="button" class="setting-row" @click="logoutKexuAccount">
               <span class="setting-icon gray"><app-icon name="LogOut" :size="19"></app-icon></span>
-              <span><strong>退出登录</strong><small>不会删除本机课程和成绩</small></span>
+              <span><strong>退出本机</strong><small>不会删除本机课程和成绩</small></span>
               <app-icon name="ChevronRight" :size="18"></app-icon>
             </button>
           </div>
           <div class="account-danger">
-            <h2>注销账号</h2>
-            <p>注销不可恢复。姓名和账号会被匿名化，本机数据不受影响。</p>
-            <div class="input-shell"><app-icon name="LockKeyhole" :size="19"></app-icon><input v-model="accountDeletePassword" type="password" maxlength="72" autocomplete="current-password" placeholder="输入课序账号密码确认"></div>
-            <button type="button" class="danger-button" :disabled="accountLoading" @click="deleteKexuAccount"><app-icon name="UserRoundX" :size="18"></app-icon>注销课序账号</button>
+            <h2>删除云端身份</h2>
+            <p>会删除云端的姓名、学号、课表与成绩缓存；本机数据不受影响。</p>
+            <button type="button" class="danger-button" :disabled="accountLoading" @click="deleteCloudIdentity"><app-icon name="UserRoundX" :size="18"></app-icon>删除云端身份</button>
           </div>
         </template>
 

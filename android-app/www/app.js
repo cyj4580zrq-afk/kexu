@@ -263,6 +263,12 @@ createApp({
       accountPrivacyConsent: false,
       accountLoginForm: { account: "", password: "" },
       accountRegisterForm: { realName: "", account: "", password: "" },
+      schoolOnboardingForm: {
+        realName: "",
+        username: localStorage.getItem(STORAGE.username) || "",
+        password: "",
+        semester
+      },
       accountDeletePassword: "",
       detailVisible: false,
       gradeDetailVisible: false,
@@ -1137,12 +1143,93 @@ createApp({
         const payload = await this.accountApiRequest("/api/auth/me");
         this.accountUser = payload.user;
         this.activateAuthenticatedApp();
+        await this.loadCloudCaches();
       } catch (_error) {
         this.accountToken = "";
         this.accountUser = null;
         localStorage.removeItem(STORAGE.accountToken);
       } finally {
         this.accountSessionReady = true;
+      }
+    },
+    async createCloudIdentity() {
+      const form = this.schoolOnboardingForm;
+      if (!form.realName.trim() || !form.username || !form.password) {
+        return this.notify("请填写姓名、学号和教务系统密码", "warning");
+      }
+      if (!this.accountPrivacyConsent) return this.notify("请先同意云端同步隐私说明", "warning");
+      this.accountLoading = true;
+      this.syncStep = "正在验证教务身份";
+      try {
+        await this.authenticateSchool(form, step => { this.syncStep = step; });
+        this.syncStep = "正在创建云端身份";
+        const payload = await this.accountApiRequest("/api/cloud/identity", {
+          method: "POST",
+          body: {
+            real_name: form.realName.trim(),
+            student_id: form.username,
+            privacy_consent: true
+          }
+        });
+        this.accountToken = payload.token;
+        this.accountUser = payload.user;
+        this.accountSessionReady = true;
+        localStorage.setItem(STORAGE.accountToken, payload.token);
+        localStorage.setItem(STORAGE.username, form.username);
+        this.syncForm.username = form.username;
+        this.gradeForm.username = form.username;
+        this.syncForm.semester = form.semester;
+        this.gradeForm.semester = form.semester;
+        form.password = "";
+        this.activeTab = "schedule";
+        this.activateAuthenticatedApp();
+        this.notify(payload.message || "教务授权成功");
+        await this.loadCloudCaches();
+      } catch (error) {
+        this.notify(error.message || "教务授权失败，请稍后重试", "error");
+      } finally {
+        this.accountLoading = false;
+        this.syncStep = "正在连接教务系统";
+      }
+    },
+    async loadCloudCache(type, semester) {
+      if (!this.accountToken || !semester) return null;
+      try {
+        const payload = await this.accountApiRequest(`/api/cloud/${type}/${semester}`);
+        return payload.cache;
+      } catch (error) {
+        console.warn(`云端${type}缓存读取失败`, error);
+        return null;
+      }
+    },
+    async saveCloudCache(type, semester, data) {
+      if (!this.accountToken) return null;
+      try {
+        return await this.accountApiRequest(`/api/cloud/${type}`, {
+          method: "POST",
+          body: { semester, data }
+        });
+      } catch (error) {
+        console.warn(`云端${type}缓存保存失败`, error);
+        this.notify("本机已保存，云端缓存将在下次网络可用时更新", "warning");
+        return null;
+      }
+    },
+    async loadCloudCaches() {
+      if (!this.accountToken) return;
+      const semester = this.syncForm.semester || defaultSemester();
+      const [courseCache, gradeCache] = await Promise.all([
+        this.loadCloudCache("courses", semester),
+        this.loadCloudCache("grades", semester)
+      ]);
+      if (courseCache?.data?.length && !this.courses.length) {
+        this.courses = courseCache.data;
+        this.persistCourses();
+        this.saveSnapshot("云端缓存恢复", semester, courseCache.data);
+      }
+      if (gradeCache?.data?.length && !this.grades.some(grade => this.gradeMatchesSemester(grade, semester))) {
+        this.replaceGradesForSemester(semester, gradeCache.data);
+        this.saveGradeSnapshot(semester, gradeCache.data);
       }
     },
     async registerKexuAccount() {
@@ -1216,6 +1303,22 @@ createApp({
         const payload = await this.accountApiRequest("/api/auth/account", {
           method: "DELETE",
           body: { password: this.accountDeletePassword }
+        });
+        this.logoutKexuAccount();
+        this.notify(payload.message);
+      } catch (error) {
+        this.notify(error.message, "error");
+      } finally {
+        this.accountLoading = false;
+      }
+    },
+    async deleteCloudIdentity() {
+      if (!window.confirm("确定删除云端身份和全部云端课表、成绩缓存吗？本机数据不会删除。")) return;
+      this.accountLoading = true;
+      try {
+        const payload = await this.accountApiRequest("/api/cloud/identity", {
+          method: "DELETE",
+          body: { confirmation: true }
         });
         this.logoutKexuAccount();
         this.notify(payload.message);
@@ -1315,9 +1418,6 @@ createApp({
       }
     },
     async authenticateSchool(credentials, setStep) {
-      const cookies = window.capacitorExports && window.capacitorExports.CapacitorCookies;
-      if (cookies) await cookies.clearAllCookies();
-
       setStep("正在选择教务线路");
       await this.selectSchoolRoute();
       const endpoints = this.schoolEndpoints();
@@ -1361,14 +1461,14 @@ createApp({
         this.privacyVisible = true;
         return;
       }
-      if (!this.syncForm.username || !this.syncForm.password) {
-        this.notify("请填写学号和密码", "warning");
+      if (!this.syncForm.username) {
+        this.notify("请填写学号", "warning");
         return;
       }
       this.syncLoading = true;
       this.schoolStatus = { type: "unknown", text: "连接中" };
       try {
-        await this.authenticateSchool(this.syncForm, step => { this.syncStep = step; });
+        await this.prepareSchoolSession(this.syncForm, step => { this.syncStep = step; });
         const endpoints = this.schoolEndpoints();
 
         this.syncStep = "正在获取课程";
@@ -1386,13 +1486,16 @@ createApp({
         });
         const payload = responseData(scheduleResponse);
         const rawCourses = payload && (payload.kbList || payload.data || []);
-        if (!Array.isArray(rawCourses)) throw new Error("教务系统返回了无法识别的课表数据");
-        const newCourses = rawCourses.map((course, index) => this.normalizeSchoolCourse(course, index));
-        if (newCourses.length) {
-          this.courses = newCourses;
-          this.persistCourses();
-          this.saveSnapshot("教务系统同步", this.syncForm.semester, newCourses);
+        if (!Array.isArray(rawCourses)) {
+          const error = new Error("教务登录状态已失效，请重新输入密码后刷新");
+          error.status = 401;
+          throw error;
         }
+        const newCourses = rawCourses.map((course, index) => this.normalizeSchoolCourse(course, index));
+        this.courses = newCourses;
+        this.persistCourses();
+        this.saveSnapshot("教务系统同步", this.syncForm.semester, newCourses);
+        await this.saveCloudCache("courses", this.syncForm.semester, newCourses);
 
         localStorage.setItem(STORAGE.username, this.syncForm.username);
         localStorage.setItem(STORAGE.semester, this.syncForm.semester);
@@ -1421,24 +1524,34 @@ createApp({
         this.notify(`已显示本地保存的 ${cachedGrades.length} 门成绩`);
         return;
       }
+      const cloudCache = await this.loadCloudCache("grades", this.gradeForm.semester);
+      if (cloudCache?.data?.length) {
+        this.replaceGradesForSemester(this.gradeForm.semester, cloudCache.data);
+        this.saveGradeSnapshot(this.gradeForm.semester, cloudCache.data);
+        this.selectedGradeSemester = semesterLabel;
+        this.gradeSyncVisible = false;
+        this.notify(`已从云端缓存读取 ${cloudCache.data.length} 门成绩`);
+        return;
+      }
       if (!this.privacyConsent) {
         this.notify("请先阅读并同意隐私说明", "warning");
         this.privacyVisible = true;
         return;
       }
-      if (!this.gradeForm.username || !this.gradeForm.password) {
-        this.notify("请填写学号和密码", "warning");
+      if (!this.gradeForm.username) {
+        this.notify("请填写学号", "warning");
         return;
       }
       this.gradeLoading = true;
       try {
-        await this.authenticateSchool(this.gradeForm, step => { this.gradeStep = step; });
+        await this.prepareSchoolSession(this.gradeForm, step => { this.gradeStep = step; });
         this.gradeStep = "正在查询成绩";
         const [startYear, _endYear, term] = this.gradeForm.semester.split("-");
         const rawGrades = await this.fetchSchoolGrades(startYear, term === "1" ? "3" : "12");
         const newGrades = rawGrades.map((grade, index) => this.normalizeSchoolGrade(grade, index));
         this.replaceGradesForSemester(this.gradeForm.semester, newGrades);
         this.saveGradeSnapshot(this.gradeForm.semester, newGrades);
+        await this.saveCloudCache("grades", this.gradeForm.semester, newGrades);
         localStorage.setItem(STORAGE.username, this.gradeForm.username);
         localStorage.setItem(STORAGE.semester, this.gradeForm.semester);
         this.gradeForm.password = "";
@@ -1787,6 +1900,14 @@ createApp({
         this.transferBusy = false;
       }
     },
+    async prepareSchoolSession(credentials, setStep) {
+      if (credentials.password) {
+        await this.authenticateSchool(credentials, setStep);
+        return;
+      }
+      setStep("正在验证教务登录状态");
+      await this.selectSchoolRoute();
+    },
     async copyScheduleCode() {
       if (!this.transferCode) return;
       try {
@@ -2050,10 +2171,21 @@ createApp({
     },
     selectSemester(value) {
       if (this.semesterSheetTarget === "grade") this.gradeForm.semester = value;
-      else this.syncForm.semester = value;
+      else {
+        this.syncForm.semester = value;
+        this.restoreCloudCoursesForSemester(value);
+      }
       localStorage.setItem(STORAGE.semester, value);
       this.semesterSheetVisible = false;
       this.tapFeedback();
+    },
+    async restoreCloudCoursesForSemester(semester) {
+      const cache = await this.loadCloudCache("courses", semester);
+      if (!cache) return;
+      this.courses = cache.data || [];
+      this.persistCourses();
+      this.saveSnapshot("云端缓存恢复", semester, this.courses);
+      this.notify(`已读取该学期云端缓存（${this.courses.length} 门课程）`);
     },
     getDayCount(day) {
       return this.coursesForSelectedWeek.filter(course => course.day === day).length;

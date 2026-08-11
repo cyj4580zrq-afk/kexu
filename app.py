@@ -104,6 +104,21 @@ class AdminPasswordChangeRequest(BaseModel):
     new_password: str = Field(min_length=10, max_length=72)
 
 
+class CloudIdentityRequest(BaseModel):
+    student_id: str = Field(pattern=r"^[A-Za-z0-9]{4,40}$")
+    real_name: str = Field(min_length=2, max_length=30)
+    privacy_consent: bool
+
+
+class CloudCacheRequest(BaseModel):
+    semester: str = Field(pattern=r"^\d{4}-\d{4}-[12]$")
+    data: list[dict]
+
+
+class CloudIdentityDeleteRequest(BaseModel):
+    confirmation: bool
+
+
 def enforce_login_rate_limit(request: Request) -> None:
     forwarded = request.headers.get("x-forwarded-for", "")
     client_ip = forwarded.split(",", 1)[0].strip() or (request.client.host if request.client else "unknown")
@@ -156,6 +171,32 @@ def initialize_account_database() -> None:
             )
         """)
         execute(connection, "CREATE INDEX IF NOT EXISTS idx_app_users_status ON app_users(status)")
+        execute(connection, "ALTER TABLE app_users ADD COLUMN IF NOT EXISTS student_id TEXT") if DATABASE_URL else None
+        if not DATABASE_URL:
+            columns = {row["name"] for row in execute(connection, "PRAGMA table_info(app_users)").fetchall()}
+            if "student_id" not in columns:
+                execute(connection, "ALTER TABLE app_users ADD COLUMN student_id TEXT")
+        execute(connection, "CREATE UNIQUE INDEX IF NOT EXISTS idx_app_users_student_id ON app_users(student_id)")
+        execute(connection, """
+            CREATE TABLE IF NOT EXISTS cloud_course_cache (
+                user_id INTEGER NOT NULL,
+                semester TEXT NOT NULL,
+                data_json TEXT NOT NULL,
+                fingerprint TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (user_id, semester)
+            )
+        """)
+        execute(connection, """
+            CREATE TABLE IF NOT EXISTS cloud_grade_cache (
+                user_id INTEGER NOT NULL,
+                semester TEXT NOT NULL,
+                data_json TEXT NOT NULL,
+                fingerprint TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (user_id, semester)
+            )
+        """)
         execute(connection, """
             CREATE TABLE IF NOT EXISTS app_admin_config (
                 id INTEGER PRIMARY KEY,
@@ -232,6 +273,7 @@ def public_user(row: Any) -> dict:
         "id": row["id"],
         "realName": row["real_name"],
         "account": row["account"],
+        "studentId": row["student_id"] or row["account"],
         "status": row["status"],
         "createdAt": row["created_at"],
     }
@@ -248,6 +290,51 @@ def current_account(authorization: str | None = Header(default=None)) -> Any:
     if row["status"] == "disabled":
         raise HTTPException(status_code=403, detail="账号已被停用")
     return row
+
+
+def cache_fingerprint(data: list[dict]) -> str:
+    encoded = json.dumps(data, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def load_cloud_cache(user_id: int, semester: str, table: str) -> dict | None:
+    with database_connection() as connection:
+        row = execute(
+            connection,
+            f"SELECT data_json, fingerprint, updated_at FROM {table} WHERE user_id = ? AND semester = ?",
+            (user_id, semester),
+        ).fetchone()
+    if not row:
+        return None
+    try:
+        data = json.loads(row["data_json"])
+    except (TypeError, json.JSONDecodeError):
+        data = []
+    return {"semester": semester, "data": data, "fingerprint": row["fingerprint"], "updatedAt": row["updated_at"]}
+
+
+def save_cloud_cache(user_id: int, request: CloudCacheRequest, table: str) -> dict:
+    fingerprint = cache_fingerprint(request.data)
+    updated_at = utc_now()
+    with database_connection() as connection:
+        existing = execute(
+            connection,
+            f"SELECT fingerprint FROM {table} WHERE user_id = ? AND semester = ?",
+            (user_id, request.semester),
+        ).fetchone()
+        if existing:
+            execute(
+                connection,
+                f"UPDATE {table} SET data_json = ?, fingerprint = ?, updated_at = ? WHERE user_id = ? AND semester = ?",
+                (json.dumps(request.data, ensure_ascii=False), fingerprint, updated_at, user_id, request.semester),
+            )
+        else:
+            execute(
+                connection,
+                f"INSERT INTO {table} (user_id, semester, data_json, fingerprint, updated_at) VALUES (?, ?, ?, ?, ?)",
+                (user_id, request.semester, json.dumps(request.data, ensure_ascii=False), fingerprint, updated_at),
+            )
+    return {"semester": request.semester, "count": len(request.data), "fingerprint": fingerprint, "updatedAt": updated_at}
 
 
 def require_admin(authorization: str | None = Header(default=None)) -> None:
@@ -596,6 +683,90 @@ def account_profile(user: Any = Depends(current_account)) -> dict:
     return {"user": public_user(user)}
 
 
+@app.post("/api/cloud/identity", status_code=status.HTTP_201_CREATED)
+def create_cloud_identity(req: CloudIdentityRequest) -> dict:
+    """Create a cloud identity after the phone has authenticated with the school directly.
+
+    This endpoint deliberately has no school-password field. The app only sends the
+    student identifier, the user's chosen name, and the explicit cloud-consent flag.
+    """
+    if not req.privacy_consent:
+        raise HTTPException(status_code=422, detail="请先同意云端同步隐私说明")
+    student_id = req.student_id.strip()
+    created_at = utc_now()
+    with database_connection() as connection:
+        row = execute(connection, "SELECT * FROM app_users WHERE student_id = ?", (student_id,)).fetchone()
+        if row:
+            if row["status"] == "deleted":
+                raise HTTPException(status_code=403, detail="该学号对应的云端身份已注销")
+            if row["status"] == "disabled":
+                raise HTTPException(status_code=403, detail="该云端身份已被停用，请联系反馈群")
+            execute(connection, "UPDATE app_users SET last_login_at = ? WHERE id = ?", (created_at, row["id"]))
+            row = execute(connection, "SELECT * FROM app_users WHERE id = ?", (row["id"],)).fetchone()
+            return {"message": "云端身份已恢复", "token": create_access_token(row["id"]), "user": public_user(row)}
+
+        # A random unusable password hash keeps the legacy account schema compatible.
+        # It is never returned or used for authentication.
+        placeholder_hash = PASSWORD_HASHER.hash(base64url_encode(os.urandom(32)))
+        statement = """INSERT INTO app_users
+               (real_name, account, password_hash, student_id, status, created_at, last_login_at, privacy_consented_at)
+               VALUES (?, ?, ?, ?, 'active', ?, ?, ?)"""
+        if DATABASE_URL:
+            statement += " RETURNING id"
+        try:
+            cursor = execute(
+                connection,
+                statement,
+                (clean_real_name(req.real_name), student_id, placeholder_hash, student_id, created_at, created_at, created_at),
+            )
+            user_id = int(cursor.fetchone()["id"] if DATABASE_URL else cursor.lastrowid)
+            row = execute(connection, "SELECT * FROM app_users WHERE id = ?", (user_id,)).fetchone()
+        except (sqlite3.IntegrityError, PostgresIntegrityError) as exc:
+            raise HTTPException(status_code=409, detail="该学号的云端身份已存在，请重新进入应用") from exc
+    return {"message": "云端身份创建成功", "token": create_access_token(row["id"]), "user": public_user(row)}
+
+
+@app.get("/api/cloud/courses/{semester}")
+def get_cloud_courses(semester: str, user: Any = Depends(current_account)) -> dict:
+    if not re.fullmatch(r"\d{4}-\d{4}-[12]", semester):
+        raise HTTPException(status_code=422, detail="学期格式无效")
+    return {"cache": load_cloud_cache(user["id"], semester, "cloud_course_cache")}
+
+
+@app.post("/api/cloud/courses")
+def put_cloud_courses(req: CloudCacheRequest, user: Any = Depends(current_account)) -> dict:
+    return {"cache": save_cloud_cache(user["id"], req, "cloud_course_cache")}
+
+
+@app.get("/api/cloud/grades/{semester}")
+def get_cloud_grades(semester: str, user: Any = Depends(current_account)) -> dict:
+    if not re.fullmatch(r"\d{4}-\d{4}-[12]", semester):
+        raise HTTPException(status_code=422, detail="学期格式无效")
+    return {"cache": load_cloud_cache(user["id"], semester, "cloud_grade_cache")}
+
+
+@app.post("/api/cloud/grades")
+def put_cloud_grades(req: CloudCacheRequest, user: Any = Depends(current_account)) -> dict:
+    return {"cache": save_cloud_cache(user["id"], req, "cloud_grade_cache")}
+
+
+@app.delete("/api/cloud/identity")
+def delete_cloud_identity(req: CloudIdentityDeleteRequest, user: Any = Depends(current_account)) -> dict:
+    if not req.confirmation:
+        raise HTTPException(status_code=422, detail="请确认删除云端身份")
+    deleted_marker = f"deleted_{user['id']}_{int(time.time())}"
+    with database_connection() as connection:
+        execute(connection, "DELETE FROM cloud_course_cache WHERE user_id = ?", (user["id"],))
+        execute(connection, "DELETE FROM cloud_grade_cache WHERE user_id = ?", (user["id"],))
+        execute(
+            connection,
+            """UPDATE app_users SET real_name = '已注销用户', account = ?, student_id = NULL,
+               password_hash = '', status = 'deleted' WHERE id = ?""",
+            (deleted_marker, user["id"]),
+        )
+    return {"message": "云端身份与云端缓存已删除，本机数据不受影响"}
+
+
 @app.delete("/api/auth/account")
 def delete_account(req: DeleteAccountRequest, user: Any = Depends(current_account)) -> dict:
     try:
@@ -619,7 +790,7 @@ def admin_users(_admin: None = Depends(require_admin)) -> dict:
     with database_connection() as connection:
         rows = execute(
             connection,
-            "SELECT id, real_name, account, status, created_at, last_login_at FROM app_users ORDER BY id DESC"
+            "SELECT id, real_name, account, student_id, status, created_at, last_login_at FROM app_users ORDER BY id DESC"
         ).fetchall()
     counts = {"total": len(rows), "active": 0, "disabled": 0, "deleted": 0}
     for row in rows:
@@ -658,7 +829,7 @@ def admin_dashboard(_admin: None = Depends(require_admin)) -> str:
     with database_connection() as connection:
         rows = execute(
             connection,
-            "SELECT id, real_name, account, status, created_at, last_login_at FROM app_users ORDER BY id DESC"
+            "SELECT id, real_name, account, student_id, status, created_at, last_login_at FROM app_users ORDER BY id DESC"
         ).fetchall()
     counts = {"active": 0, "disabled": 0, "deleted": 0}
     for row in rows:
@@ -673,7 +844,7 @@ def admin_dashboard(_admin: None = Depends(require_admin)) -> str:
         table_rows.append(
             "<tr>"
             f'<td>{row["id"]}</td><td>{html.escape(row["real_name"])}</td>'
-            f'<td>{html.escape(row["account"])}</td><td><span class="status {row["status"]}">{status_text[row["status"]]}</span></td>'
+            f'<td>{html.escape(row["student_id"] or row["account"])}</td><td><span class="status {row["status"]}">{status_text[row["status"]]}</span></td>'
             f'<td>{html.escape(row["created_at"])}</td><td>{html.escape(row["last_login_at"] or "尚未登录")}</td><td>{action}</td>'
             "</tr>"
         )
@@ -687,8 +858,8 @@ h1{{margin:0 0 6px;font-size:28px}}p{{margin:0;color:#718096}}.cards{{display:gr
 button{{padding:7px 12px;border:1px solid #dce3eb;border-radius:6px;background:#fff;cursor:pointer}}small{{display:block;margin-top:16px;color:#8a95a4}}@media(max-width:700px){{.cards{{grid-template-columns:1fr 1fr}}}}
 </style></head><body><main><h1>课序账号后台</h1><p>姓名为用户自行填写，未经过学校实名核验。</p>
 <section class="cards"><div class="card">注册总数<strong>{len(rows)}</strong></div><div class="card">正常<strong>{counts['active']}</strong></div><div class="card">停用<strong>{counts['disabled']}</strong></div><div class="card">已注销<strong>{counts['deleted']}</strong></div></section>
-<section class="table"><table><thead><tr><th>ID</th><th>姓名</th><th>账号</th><th>状态</th><th>注册时间</th><th>最后登录</th><th>操作</th></tr></thead><tbody>{''.join(table_rows) or '<tr><td colspan="7">暂无注册账号</td></tr>'}</tbody></table></section>
-<small>后台不保存课序明文密码，也不接收教务密码、课表或成绩。</small></main><script>
+<section class="table"><table><thead><tr><th>ID</th><th>姓名</th><th>学号</th><th>状态</th><th>注册时间</th><th>最后登录</th><th>操作</th></tr></thead><tbody>{''.join(table_rows) or '<tr><td colspan="7">暂无云端身份</td></tr>'}</tbody></table></section>
+<small>后台不保存教务密码或会话凭据；云端课表和成绩仅由用户主动同步。</small></main><script>
 document.addEventListener('click',async e=>{{const b=e.target.closest('button[data-id]');if(!b)return;if(!confirm('确定修改该账号状态吗？'))return;const r=await fetch(`/api/admin/users/${{b.dataset.id}}/status`,{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{status:b.dataset.status}})}});if(r.ok)location.reload();else alert((await r.json()).detail||'操作失败')}})
 </script></body></html>"""
 
