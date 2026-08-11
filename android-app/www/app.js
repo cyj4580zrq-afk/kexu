@@ -1408,7 +1408,9 @@ createApp({
           lastError = error;
         }
       }
-      throw new Error(lastError?.message || "教务系统暂时无法连接");
+      const error = new Error("教务系统当前无法连接，请稍后再试");
+      error.status = lastError?.status || 504;
+      throw error;
     },
     async checkSchoolStatus() {
       try {
