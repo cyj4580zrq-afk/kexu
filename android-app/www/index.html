@@ -355,7 +355,7 @@
               <strong>{{ grade.name }}</strong>
               <small>{{ grade.semester }} · {{ grade.credit }} 学分 · 绩点 {{ grade.gpa }}</small>
               <em class="grade-teacher">{{ grade.teacher }}</em>
-              <em v-if="grade.components.length">{{ grade.components.map(item => item.label).join(' / ') }}</em>
+              <em v-if="grade.components && grade.components.length">{{ grade.components.map(item => item.label).join(' / ') }}</em>
             </span>
             <app-icon name="ChevronRight" :size="18"></app-icon>
           </button>
@@ -408,7 +408,7 @@
           <h2>常用功能</h2>
           <button type="button" class="setting-row" @click="openTab('account')">
             <span class="setting-icon blue"><app-icon name="CircleUserRound" :size="19"></app-icon></span>
-            <span><strong>云端身份</strong><small>{{ accountUser ? `${accountUser.realName} · ${accountUser.studentId}` : '用教务学号授权后自动创建' }}</small></span>
+            <span><strong>云端身份</strong><small>{{ accountUser ? `${accountUser.realName || '已授权用户'} · ${accountUser.studentId || accountUser.account || ''}` : '用教务学号授权后自动创建' }}</small></span>
             <em v-if="accountUser" class="account-state">正常</em>
             <app-icon name="ChevronRight" :size="18"></app-icon>
           </button>
@@ -458,7 +458,7 @@
           </button>
         </div>
 
-        <p class="version-text">课序 2.1.1 Beta</p>
+        <p class="version-text">课序 2.1.2 Beta</p>
       </section>
 
       <section v-show="activeTab === 'account'" class="page standard-page account-page">
@@ -469,8 +469,8 @@
 
         <template v-if="accountUser">
           <section class="account-profile-card">
-            <span class="account-avatar">{{ accountUser.realName.slice(0, 1) }}</span>
-            <div><small>已授权</small><h2>{{ accountUser.realName }}</h2><p>学号 {{ accountUser.studentId }}</p></div>
+            <span class="account-avatar">{{ (accountUser.realName || '已').slice(0, 1) }}</span>
+            <div><small>已授权</small><h2>{{ accountUser.realName || '已授权用户' }}</h2><p>学号 {{ accountUser.studentId || accountUser.account || '--' }}</p></div>
             <span class="account-active"><i></i>正常</span>
           </section>
           <div class="account-note"><app-icon name="ShieldCheck" :size="18"></app-icon><p>教务密码不会上传或保存。你同意同步的课表与成绩会保存至云端，供本设备和后续设备读取。</p></div>
@@ -738,7 +738,7 @@
           </button>
         </div>
 
-        <p class="version-text">课序 2.1.1 Beta</p>
+        <p class="version-text">课序 2.1.2 Beta</p>
       </section>
     </main>
 
@@ -883,7 +883,7 @@
         <div class="grade-detail-total"><span>总评</span><strong>{{ activeGrade.score }}</strong><em>绩点 {{ activeGrade.gpa }} · {{ activeGrade.credit }} 学分</em></div>
         <div class="grade-teacher-detail"><app-icon name="UserRound" :size="16"></app-icon><span>任课教师</span><strong>{{ activeGrade.teacher }}</strong></div>
         <div v-if="gradeDetailLoading" class="grade-detail-loading"><app-icon name="LoaderCircle" :size="18" class="spinning"></app-icon>正在读取成绩组成</div>
-        <div v-else-if="activeGrade.components.length" class="grade-components">
+        <div v-else-if="activeGrade.components && activeGrade.components.length" class="grade-components">
           <div v-for="item in activeGrade.components" :key="item.label"><span>{{ item.label }}</span><strong>{{ item.value }}</strong><em v-if="item.weight">{{ item.weight }}</em></div>
         </div>
         <p v-else class="grade-detail-empty">教务系统暂未提供该课程的分项成绩，仅显示总评。</p>

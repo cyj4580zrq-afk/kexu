@@ -11,7 +11,7 @@ const SCHOOL_GRADE_REFERER_PATH = "/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005";
 const SCHOOL_GRADE_DETAIL_PATH = "/cjcx/cjcx_cxCjxqGjh.html";
 // Temporary Aliyun endpoint while the production HTTPS domain is being configured.
 const ACCOUNT_API_BASE = localStorage.getItem("kexu-account-api-base") || "http://47.122.105.185";
-const APP_VERSION = "2.1.1-beta";
+const APP_VERSION = "2.1.2-beta";
 const STORAGE = {
   courses: "campusflow-courses",
   history: "campusflow-sync-history",
@@ -142,6 +142,26 @@ function readJson(key, fallback) {
   } catch (_error) {
     return fallback;
   }
+}
+
+function normalizeStoredGrade(grade) {
+  const item = grade && typeof grade === "object" ? grade : {};
+  return {
+    ...item,
+    components: Array.isArray(item.components) ? item.components : [],
+    remote: item.remote && typeof item.remote === "object" ? item.remote : {},
+    detailFetched: Boolean(item.detailFetched)
+  };
+}
+
+function normalizeAccountUser(user) {
+  if (!user || typeof user !== "object") return null;
+  const studentId = String(user.studentId || user.student_id || user.account || "").trim();
+  return {
+    ...user,
+    realName: String(user.realName || user.real_name || "已授权用户").trim() || "已授权用户",
+    studentId
+  };
 }
 
 function localDate(value) {
@@ -277,7 +297,7 @@ createApp({
       activeGrade: null,
       courses: readJson(STORAGE.courses, []),
       syncHistory: readJson(STORAGE.history, []),
-      grades: readJson(STORAGE.grades, []),
+      grades: readJson(STORAGE.grades, []).map(normalizeStoredGrade),
       gradeHistory: readJson(STORAGE.gradeHistory, []),
       selectedGradeSemester: "全部",
       gradeSyncVisible: false,
@@ -792,7 +812,7 @@ createApp({
         this.database = database;
         this.databaseReady = true;
         this.courses = loaded.courses;
-        this.grades = loaded.grades;
+        this.grades = Array.isArray(loaded.grades) ? loaded.grades.map(normalizeStoredGrade) : [];
         this.syncHistory = loaded.syncHistory;
         this.gradeHistory = loaded.gradeHistory;
       } catch (error) {
@@ -1142,7 +1162,7 @@ createApp({
       }
       try {
         const payload = await this.accountApiRequest("/api/auth/me");
-        this.accountUser = payload.user;
+        this.accountUser = normalizeAccountUser(payload.user);
         this.activateAuthenticatedApp();
         await this.loadCloudCaches();
       } catch (_error) {
@@ -1173,7 +1193,7 @@ createApp({
           }
         });
         this.accountToken = payload.token;
-        this.accountUser = payload.user;
+        this.accountUser = normalizeAccountUser(payload.user);
         this.accountSessionReady = true;
         localStorage.setItem(STORAGE.accountToken, payload.token);
         localStorage.setItem(STORAGE.username, form.username);
@@ -1251,7 +1271,7 @@ createApp({
           }
         });
         this.accountToken = payload.token;
-        this.accountUser = payload.user;
+        this.accountUser = normalizeAccountUser(payload.user);
         this.accountSessionReady = true;
         this.activeTab = "schedule";
         this.activateAuthenticatedApp();
@@ -1273,7 +1293,7 @@ createApp({
           body: this.accountLoginForm
         });
         this.accountToken = payload.token;
-        this.accountUser = payload.user;
+        this.accountUser = normalizeAccountUser(payload.user);
         this.accountSessionReady = true;
         this.activeTab = "schedule";
         this.activateAuthenticatedApp();
@@ -1679,7 +1699,7 @@ createApp({
       return grade.semester === this.gradeSemesterLabel(semesterValue);
     },
     replaceGradesForSemester(semesterValue, grades) {
-      this.grades = [...this.grades.filter(grade => !this.gradeMatchesSemester(grade, semesterValue)), ...grades];
+      this.grades = [...this.grades.filter(grade => !this.gradeMatchesSemester(grade, semesterValue)), ...grades.map(normalizeStoredGrade)];
       this.persistGrades();
     },
     deleteGradesForSemester() {
