@@ -381,6 +381,8 @@ body.dark .focus-panel.free-day:active { background: #f1f4f8; color: #131a26; }
 .input-shell input, .input-shell select { min-width: 0; height: 100%; flex: 1; border: 0; outline: 0; background: transparent; color: var(--text); font-size: 15px; }
 .input-shell input::placeholder, textarea::placeholder { color: color-mix(in srgb, var(--muted) 70%, transparent); }
 .input-shell select { appearance: none; }
+.authorized-identity > span { min-width: 0; overflow: hidden; color: var(--text); font-size: 15px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.reauth-trigger { width: fit-content; padding: 2px 0; border: 0; background: transparent; color: var(--blue); font-size: 12px; font-weight: 700; text-align: left; }
 .semester-trigger { width: 100%; justify-content: flex-start; text-align: left; }
 .semester-trigger > span:nth-child(2) { min-width: 0; flex: 1; overflow: hidden; color: var(--text); font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
 .input-icon { display: grid; padding: 5px; place-items: center; border: 0; background: transparent; color: var(--muted); }

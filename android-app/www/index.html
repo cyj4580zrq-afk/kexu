@@ -272,12 +272,14 @@
         </div>
 
         <form class="form-stack" @submit.prevent="syncFromSchool">
-          <label class="field-label" for="student-id">教务系统学号</label>
-          <div class="input-shell">
+          <label class="field-label">已授权教务身份</label>
+          <div class="input-shell authorized-identity">
             <app-icon name="UserRound" :size="19"></app-icon>
-            <input id="student-id" v-model.trim="syncForm.username" inputmode="numeric" autocomplete="username" placeholder="请输入学号">
+            <span>{{ syncForm.username }}</span>
           </div>
 
+          <button type="button" class="reauth-trigger" @click="showSchoolReauth = !showSchoolReauth">{{ showSchoolReauth ? '收起重新验证' : '教务会话失效？重新验证' }}</button>
+          <template v-if="showSchoolReauth">
           <label class="field-label" for="student-password">教务系统密码</label>
           <div class="input-shell">
             <app-icon name="LockKeyhole" :size="19"></app-icon>
@@ -302,7 +304,7 @@
 
           <button class="primary-button" type="submit" :disabled="syncLoading">
             <app-icon :name="syncLoading ? 'LoaderCircle' : 'RefreshCw'" :size="20" :class="{ spinning: syncLoading }"></app-icon>
-            {{ syncLoading ? syncStep : '登录并同步课表' }}
+            {{ syncLoading ? syncStep : '同步课表' }}
           </button>
           <label class="consent-row">
             <input v-model="privacyConsent" type="checkbox">
@@ -456,7 +458,7 @@
           </button>
         </div>
 
-        <p class="version-text">课序 2.1.0 Beta</p>
+        <p class="version-text">课序 2.1.1 Beta</p>
       </section>
 
       <section v-show="activeTab === 'account'" class="page standard-page account-page">
@@ -480,6 +482,7 @@
               <app-icon name="ChevronRight" :size="18"></app-icon>
             </button>
           </div>
+          </template>
           <div class="account-danger">
             <h2>删除云端身份</h2>
             <p>会删除云端的姓名、学号、课表与成绩缓存；本机数据不受影响。</p>
@@ -735,7 +738,7 @@
           </button>
         </div>
 
-        <p class="version-text">课序 2.1.0 Beta</p>
+        <p class="version-text">课序 2.1.1 Beta</p>
       </section>
     </main>
 
@@ -893,10 +896,10 @@
         <div class="sheet-handle"></div>
         <header><div><h2 id="grade-sync-title">查询成绩</h2><p>只查询所选学期，已保存成绩不会被改动</p></div><button type="button" aria-label="关闭" @click="gradeSyncVisible = false"><app-icon name="X" :size="21"></app-icon></button></header>
         <form class="form-stack" @submit.prevent="syncGradesFromSchool">
-          <label class="field-label" for="grade-student-id">教务系统学号</label>
-          <div class="input-shell"><app-icon name="UserRound" :size="19"></app-icon><input id="grade-student-id" v-model.trim="gradeForm.username" inputmode="numeric" autocomplete="username" placeholder="请输入学号"></div>
-          <label class="field-label" for="grade-student-password">教务系统密码</label>
-          <div class="input-shell"><app-icon name="LockKeyhole" :size="19"></app-icon><input id="grade-student-password" v-model="gradeForm.password" :type="showPassword ? 'text' : 'password'" autocomplete="current-password" placeholder="请输入密码"><button type="button" class="input-icon" :aria-label="showPassword ? '隐藏密码' : '显示密码'" @click="showPassword = !showPassword"><app-icon :name="showPassword ? 'EyeOff' : 'Eye'" :size="19"></app-icon></button></div>
+          <label class="field-label">已授权教务身份</label>
+          <div class="input-shell authorized-identity"><app-icon name="UserRound" :size="19"></app-icon><span>{{ gradeForm.username }}</span></div>
+          <button type="button" class="reauth-trigger" @click="showSchoolReauth = !showSchoolReauth">{{ showSchoolReauth ? '收起重新验证' : '教务会话失效？重新验证' }}</button>
+          <template v-if="showSchoolReauth"><label class="field-label" for="grade-student-password">教务系统密码</label><div class="input-shell"><app-icon name="LockKeyhole" :size="19"></app-icon><input id="grade-student-password" v-model="gradeForm.password" :type="showPassword ? 'text' : 'password'" autocomplete="current-password" placeholder="仅会话失效时填写"><button type="button" class="input-icon" :aria-label="showPassword ? '隐藏密码' : '显示密码'" @click="showPassword = !showPassword"><app-icon :name="showPassword ? 'EyeOff' : 'Eye'" :size="19"></app-icon></button></div></template>
           <label class="field-label">查询学期</label>
           <button type="button" class="input-shell semester-trigger" @click="openSemesterSheet('grade')"><app-icon name="CalendarRange" :size="19"></app-icon><span>{{ selectedGradeSemesterLabel }}</span><app-icon name="ChevronDown" :size="17"></app-icon></button>
           <button class="primary-button" type="submit" :disabled="gradeLoading"><app-icon :name="gradeLoading ? 'LoaderCircle' : 'Search'" :size="20" :class="{ spinning: gradeLoading }"></app-icon>{{ gradeLoading ? gradeStep : '查询并保存本学期成绩' }}</button>
