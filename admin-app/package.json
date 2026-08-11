@@ -1,0 +1,16 @@
+{
+  "name": "kexu-admin",
+  "version": "1.1.0-beta",
+  "private": true,
+  "scripts": {
+    "sync:android": "cap sync android",
+    "build:apk": "cd android && gradlew.bat assembleRelease"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.4.2",
+    "@capacitor/core": "8.4.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.4.2"
+  }
+}

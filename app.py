@@ -13,6 +13,7 @@ from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Literal
+from zoneinfo import ZoneInfo
 
 import requests
 from argon2 import PasswordHasher
@@ -49,6 +50,8 @@ AUTH_SECRET = os.getenv("AUTH_SECRET", "kexu-local-development-secret-change-me"
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 TOKEN_TTL_DAYS = 30
+ONLINE_WINDOW_SECONDS = 150
+CHINA_TZ = ZoneInfo("Asia/Shanghai")
 PASSWORD_HASHER = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=2)
 
 app = FastAPI(title="CampusFlow WHCIBE Schedule API", version="2.0.0")
@@ -119,6 +122,13 @@ class CloudIdentityDeleteRequest(BaseModel):
     confirmation: bool
 
 
+class StudentProfileRequest(BaseModel):
+    college: str = Field(default="", max_length=80)
+    department: str = Field(default="", max_length=80)
+    major: str = Field(default="", max_length=80)
+    class_name: str = Field(default="", max_length=80)
+
+
 def enforce_login_rate_limit(request: Request) -> None:
     forwarded = request.headers.get("x-forwarded-for", "")
     client_ip = forwarded.split(",", 1)[0].strip() or (request.client.host if request.client else "unknown")
@@ -134,6 +144,15 @@ def enforce_login_rate_limit(request: Request) -> None:
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def china_time(value: str | None) -> str | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(CHINA_TZ).strftime("%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return value
 
 
 def database_connection() -> Any:
@@ -171,11 +190,15 @@ def initialize_account_database() -> None:
             )
         """)
         execute(connection, "CREATE INDEX IF NOT EXISTS idx_app_users_status ON app_users(status)")
-        execute(connection, "ALTER TABLE app_users ADD COLUMN IF NOT EXISTS student_id TEXT") if DATABASE_URL else None
-        if not DATABASE_URL:
-            columns = {row["name"] for row in execute(connection, "PRAGMA table_info(app_users)").fetchall()}
-            if "student_id" not in columns:
-                execute(connection, "ALTER TABLE app_users ADD COLUMN student_id TEXT")
+        user_columns = {"student_id": "TEXT", "college": "TEXT", "department": "TEXT", "major": "TEXT", "class_name": "TEXT", "profile_updated_at": "TEXT", "last_seen_at": "TEXT"}
+        if DATABASE_URL:
+            for column, column_type in user_columns.items():
+                execute(connection, f"ALTER TABLE app_users ADD COLUMN IF NOT EXISTS {column} {column_type}")
+        else:
+            existing_columns = {row["name"] for row in execute(connection, "PRAGMA table_info(app_users)").fetchall()}
+            for column, column_type in user_columns.items():
+                if column not in existing_columns:
+                    execute(connection, f"ALTER TABLE app_users ADD COLUMN {column} {column_type}")
         execute(connection, "CREATE UNIQUE INDEX IF NOT EXISTS idx_app_users_student_id ON app_users(student_id)")
         execute(connection, """
             CREATE TABLE IF NOT EXISTS cloud_course_cache (
@@ -274,6 +297,11 @@ def public_user(row: Any) -> dict:
         "realName": row["real_name"],
         "account": row["account"],
         "studentId": row["student_id"] or row["account"],
+        "college": row["college"] or "",
+        "department": row["department"] or "",
+        "major": row["major"] or "",
+        "className": row["class_name"] or "",
+        "profileUpdatedAt": china_time(row["profile_updated_at"]),
         "status": row["status"],
         "createdAt": row["created_at"],
     }
@@ -289,6 +317,8 @@ def current_account(authorization: str | None = Header(default=None)) -> Any:
         raise HTTPException(status_code=401, detail="账号不存在或已注销")
     if row["status"] == "disabled":
         raise HTTPException(status_code=403, detail="账号已被停用")
+    with database_connection() as connection:
+        execute(connection, "UPDATE app_users SET last_seen_at = ? WHERE id = ?", (utc_now(), user_id))
     return row
 
 
@@ -767,6 +797,22 @@ def delete_cloud_identity(req: CloudIdentityDeleteRequest, user: Any = Depends(c
     return {"message": "云端身份与云端缓存已删除，本机数据不受影响"}
 
 
+@app.post("/api/cloud/presence")
+def update_cloud_presence(user: Any = Depends(current_account)) -> dict:
+    return {"online": True, "seenAt": china_time(utc_now())}
+
+
+@app.post("/api/cloud/profile")
+def update_student_profile(req: StudentProfileRequest, user: Any = Depends(current_account)) -> dict:
+    updated_at = utc_now()
+    with database_connection() as connection:
+        execute(connection, """UPDATE app_users SET college = ?, department = ?, major = ?, class_name = ?,
+                   profile_updated_at = ? WHERE id = ?""", (
+            req.college.strip(), req.department.strip(), req.major.strip(), req.class_name.strip(), updated_at, user["id"]
+        ))
+    return {"message": "个人资料已同步", "updatedAt": china_time(updated_at)}
+
+
 @app.delete("/api/auth/account")
 def delete_account(req: DeleteAccountRequest, user: Any = Depends(current_account)) -> dict:
     try:
@@ -790,12 +836,26 @@ def admin_users(_admin: None = Depends(require_admin)) -> dict:
     with database_connection() as connection:
         rows = execute(
             connection,
-            "SELECT id, real_name, account, student_id, status, created_at, last_login_at FROM app_users ORDER BY id DESC"
+            """SELECT id, real_name, account, student_id, college, department, major, class_name,
+               status, created_at, last_login_at, last_seen_at, profile_updated_at FROM app_users ORDER BY id DESC"""
         ).fetchall()
-    counts = {"total": len(rows), "active": 0, "disabled": 0, "deleted": 0}
+    counts = {"total": len(rows), "active": 0, "disabled": 0, "deleted": 0, "online": 0}
+    now = datetime.now(timezone.utc)
+    users = []
     for row in rows:
         counts[row["status"]] += 1
-    return {"counts": counts, "users": [dict(row) for row in rows]}
+        item = dict(row)
+        try:
+            last_seen = datetime.fromisoformat(str(item.get("last_seen_at") or "").replace("Z", "+00:00"))
+            item["online"] = item["status"] == "active" and (now - last_seen).total_seconds() <= ONLINE_WINDOW_SECONDS
+        except ValueError:
+            item["online"] = False
+        for key in ("created_at", "last_login_at", "last_seen_at", "profile_updated_at"):
+            item[key] = china_time(item.get(key))
+        users.append(item)
+        if item["online"]:
+            counts["online"] += 1
+    return {"counts": counts, "timezone": "Asia/Shanghai", "users": users}
 
 
 @app.post("/api/admin/users/{user_id}/status")

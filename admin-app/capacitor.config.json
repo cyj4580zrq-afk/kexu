@@ -1,0 +1,11 @@
+{
+  "appId": "com.campusflow.kexuadmin",
+  "appName": "课序管理端",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}

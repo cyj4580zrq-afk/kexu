@@ -33,6 +33,18 @@ android-app/android/capacitor-cordova-android-plugins/
 *.jks
 *.keystore
 android-app/release-signing/
+admin-app/node_modules/
+admin-app/.playwright-cli/
+admin-app/android/.gradle/
+admin-app/android/**/build/
+admin-app/android/local.properties
+admin-app/android/app/src/main/assets/public/
+admin-app/android/app/src/main/assets/capacitor.config.json
+admin-app/android/app/src/main/assets/capacitor.plugins.json
+admin-app/android/app/src/main/res/xml/config.xml
+admin-app/android/capacitor-cordova-android-plugins/
+admin-app/local-releases/
+admin-app/release-signing/
 
 # iOS and Xcode build output
 .DS_Store

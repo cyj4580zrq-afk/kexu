@@ -278,6 +278,7 @@ createApp({
       accountLoading: false,
       accountSessionReady: false,
       appFeaturesStarted: false,
+      presenceTimer: null,
       accountToken: localStorage.getItem(STORAGE.accountToken) || "",
       accountUser: null,
       accountPrivacyConsent: false,
@@ -637,6 +638,7 @@ createApp({
     if (this.backButtonListener) this.backButtonListener.remove();
     if (this.autoUpdateTimer) clearTimeout(this.autoUpdateTimer);
     if (this.countdownTimer) clearInterval(this.countdownTimer);
+    if (this.presenceTimer) clearInterval(this.presenceTimer);
     if (this.tabTransitionTimer) clearTimeout(this.tabTransitionTimer);
     if (!this.systemThemeQuery) return;
     if (this.systemThemeQuery.removeEventListener) this.systemThemeQuery.removeEventListener("change", this.applyTheme);
@@ -648,6 +650,8 @@ createApp({
       this.appFeaturesStarted = true;
       this.initializePersistentStorage();
       this.checkSchoolStatus();
+      this.reportPresence();
+      this.presenceTimer = setInterval(() => this.reportPresence(), 60000);
       this.loadDailyQuote();
       this.countdownTimer = setInterval(() => {
         this.countdownNow = Date.now();
@@ -657,8 +661,10 @@ createApp({
     deactivateAuthenticatedApp() {
       if (this.autoUpdateTimer) clearTimeout(this.autoUpdateTimer);
       if (this.countdownTimer) clearInterval(this.countdownTimer);
+      if (this.presenceTimer) clearInterval(this.presenceTimer);
       this.autoUpdateTimer = null;
       this.countdownTimer = null;
+      this.presenceTimer = null;
       this.appFeaturesStarted = false;
     },
     async loadDailyQuote() {
@@ -1154,6 +1160,14 @@ createApp({
       try { payload = await response.json(); } catch (_error) { payload = {}; }
       if (!response.ok) throw new Error(payload.detail || "账号服务请求失败");
       return payload;
+    },
+    async reportPresence() {
+      if (!this.accountToken) return;
+      try {
+        await this.accountApiRequest("/api/cloud/presence", { method: "POST" });
+      } catch (_error) {
+        // Presence is advisory only; never interrupt normal use when the service is unavailable.
+      }
     },
     async restoreAccountSession() {
       if (!this.accountToken) {
