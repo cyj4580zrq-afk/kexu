@@ -73,7 +73,7 @@ function renderUsers(items) {
     header.append(title, status);
     const meta = document.createElement("div");
     meta.className = "meta";
-    const profile = [user.college, user.department, user.major, user.class_name].filter(Boolean).join(" · ") || "个人学籍资料尚未同步";
+    const profile = [user.college, user.department, user.major, user.class_name, user.entry_grade && `${user.entry_grade}级`, user.enrollment_status].filter(Boolean).join(" · ") || "个人学籍资料尚未同步";
     meta.textContent = `学籍资料：${profile}\n注册：${formatDate(user.created_at)}\n最后活跃：${formatDate(user.last_seen_at)}\n最后登录：${formatDate(user.last_login_at)}`;
     card.append(header, meta);
     if (user.status !== "deleted") {

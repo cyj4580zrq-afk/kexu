@@ -11,7 +11,7 @@ const SCHOOL_GRADE_REFERER_PATH = "/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005";
 const SCHOOL_GRADE_DETAIL_PATH = "/cjcx/cjcx_cxCjxqGjh.html";
 // Temporary Aliyun endpoint while the production HTTPS domain is being configured.
 const ACCOUNT_API_BASE = localStorage.getItem("kexu-account-api-base") || "http://47.122.105.185";
-const APP_VERSION = "2.1.2-beta";
+const APP_VERSION = "2.1.6-beta";
 const STORAGE = {
   courses: "campusflow-courses",
   history: "campusflow-sync-history",
@@ -170,6 +170,24 @@ function normalizeAccountUser(user) {
   };
 }
 
+function profileValueFromHtml(html, elementId) {
+  const matcher = new RegExp(`<[^>]*id=["']${elementId}["'][^>]*>[\\s\\S]*?<p[^>]*>([\\s\\S]*?)<\\/p>`, "i");
+  const match = String(html || "").match(matcher);
+  return match ? match[1].replace(/<[^>]+>/g, " ").replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim() : "";
+}
+
+function parseSchoolProfileHtml(html) {
+  return {
+    realName: profileValueFromHtml(html, "col_xm"),
+    college: profileValueFromHtml(html, "col_jg_id"),
+    department: profileValueFromHtml(html, "col_x_id"),
+    major: profileValueFromHtml(html, "col_zyh_id"),
+    className: profileValueFromHtml(html, "col_bh_id"),
+    grade: profileValueFromHtml(html, "col_njdm_id"),
+    enrollmentStatus: profileValueFromHtml(html, "col_xjztdm")
+  };
+}
+
 function localDate(value) {
   const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return null;
@@ -284,6 +302,7 @@ createApp({
       accountLoading: false,
       accountSessionReady: false,
       appFeaturesStarted: false,
+      schoolAuthorized: false,
       presenceTimer: null,
       authRequiredVisible: false,
       authRequiredTarget: "",
@@ -740,7 +759,7 @@ createApp({
       });
     },
     openTab(tab) {
-      if (!this.accountUser && tab !== "schedule") {
+      if (!this.accountUser && !this.schoolAuthorized && tab !== "schedule") {
         this.authRequiredTarget = tab;
         this.authRequiredVisible = true;
         this.tapFeedback();
@@ -1264,6 +1283,7 @@ createApp({
       this.syncStep = "正在验证教务身份";
       try {
         await this.authenticateSchool(form, step => { this.syncStep = step; });
+        this.schoolAuthorized = true;
         localStorage.setItem(STORAGE.username, form.username);
         this.syncForm.username = form.username;
         this.gradeForm.username = form.username;
@@ -1273,14 +1293,38 @@ createApp({
         this.activeTab = target;
         this.notify("教务登录成功");
 
+        let profile = {};
+        try {
+          this.syncStep = "正在读取学籍资料";
+          profile = await this.fetchSchoolProfile();
+        } catch (profileError) {
+          // 资料页未开放或会话失效时，不能阻断用户正常使用课表功能。
+          console.warn("学籍资料暂未读取", profileError);
+        }
+
         try {
           const payload = await this.accountApiRequest("/api/cloud/identity", {
             method: "POST",
-            body: { real_name: `学号${form.username}`, student_id: form.username, privacy_consent: true }
+            body: {
+              real_name: profile.realName || `学号${form.username}`,
+              student_id: form.username,
+              privacy_consent: true
+            }
           });
           this.accountToken = payload.token;
           this.accountUser = normalizeAccountUser(payload.user);
           localStorage.setItem(STORAGE.accountToken, payload.token);
+          await this.accountApiRequest("/api/cloud/profile", {
+            method: "POST",
+            body: {
+              college: profile.college,
+              department: profile.department,
+              major: profile.major,
+              class_name: profile.className,
+              entry_grade: profile.grade,
+              enrollment_status: profile.enrollmentStatus
+            }
+          });
           this.activateAuthenticatedApp();
           await this.loadCloudCaches();
         } catch (cloudError) {
@@ -1486,8 +1530,21 @@ createApp({
         grades: `${base}${SCHOOL_GRADE_PATH}`,
         gradesReferer: `${base}${SCHOOL_GRADE_REFERER_PATH}`,
         gradeDetail: `${base}${SCHOOL_GRADE_DETAIL_PATH}`,
-        gradeDetailReferer: `${base}${SCHOOL_GRADE_REFERER_PATH}&layout=default`
+        gradeDetailReferer: `${base}${SCHOOL_GRADE_REFERER_PATH}&layout=default`,
+        profile: `${base}/xsxxxggl/xsgrxxwh_cxXsgrxx.html?gnmkdm=N100801`
       };
+    },
+    async fetchSchoolProfile() {
+      const endpoints = this.schoolEndpoints();
+      const response = await this.httpRequest("GET", endpoints.profile, {
+        responseType: "text",
+        headers: { Referer: endpoints.scheduleReferer }
+      });
+      const profile = parseSchoolProfileHtml(htmlText(response));
+      if (!profile.realName && !profile.major && !profile.className) {
+        throw new Error("未能读取教务个人资料");
+      }
+      return profile;
     },
     async selectSchoolRoute() {
       const routes = [

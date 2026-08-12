@@ -127,6 +127,8 @@ class StudentProfileRequest(BaseModel):
     department: str = Field(default="", max_length=80)
     major: str = Field(default="", max_length=80)
     class_name: str = Field(default="", max_length=80)
+    entry_grade: str = Field(default="", max_length=20)
+    enrollment_status: str = Field(default="", max_length=30)
 
 
 def enforce_login_rate_limit(request: Request) -> None:
@@ -190,7 +192,7 @@ def initialize_account_database() -> None:
             )
         """)
         execute(connection, "CREATE INDEX IF NOT EXISTS idx_app_users_status ON app_users(status)")
-        user_columns = {"student_id": "TEXT", "college": "TEXT", "department": "TEXT", "major": "TEXT", "class_name": "TEXT", "profile_updated_at": "TEXT", "last_seen_at": "TEXT"}
+        user_columns = {"student_id": "TEXT", "college": "TEXT", "department": "TEXT", "major": "TEXT", "class_name": "TEXT", "entry_grade": "TEXT", "enrollment_status": "TEXT", "profile_updated_at": "TEXT", "last_seen_at": "TEXT"}
         if DATABASE_URL:
             for column, column_type in user_columns.items():
                 execute(connection, f"ALTER TABLE app_users ADD COLUMN IF NOT EXISTS {column} {column_type}")
@@ -301,6 +303,8 @@ def public_user(row: Any) -> dict:
         "department": row["department"] or "",
         "major": row["major"] or "",
         "className": row["class_name"] or "",
+        "entryGrade": row["entry_grade"] or "",
+        "enrollmentStatus": row["enrollment_status"] or "",
         "profileUpdatedAt": china_time(row["profile_updated_at"]),
         "status": row["status"],
         "createdAt": row["created_at"],
@@ -731,7 +735,7 @@ def create_cloud_identity(req: CloudIdentityRequest) -> dict:
                 raise HTTPException(status_code=403, detail="该学号对应的云端身份已注销")
             if row["status"] == "disabled":
                 raise HTTPException(status_code=403, detail="该云端身份已被停用，请联系反馈群")
-            execute(connection, "UPDATE app_users SET last_login_at = ? WHERE id = ?", (created_at, row["id"]))
+            execute(connection, "UPDATE app_users SET real_name = ?, last_login_at = ? WHERE id = ?", (clean_real_name(req.real_name), created_at, row["id"]))
             row = execute(connection, "SELECT * FROM app_users WHERE id = ?", (row["id"],)).fetchone()
             return {"message": "云端身份已恢复", "token": create_access_token(row["id"]), "user": public_user(row)}
 
@@ -806,9 +810,9 @@ def update_cloud_presence(user: Any = Depends(current_account)) -> dict:
 def update_student_profile(req: StudentProfileRequest, user: Any = Depends(current_account)) -> dict:
     updated_at = utc_now()
     with database_connection() as connection:
-        execute(connection, """UPDATE app_users SET college = ?, department = ?, major = ?, class_name = ?,
+        execute(connection, """UPDATE app_users SET college = ?, department = ?, major = ?, class_name = ?, entry_grade = ?, enrollment_status = ?,
                    profile_updated_at = ? WHERE id = ?""", (
-            req.college.strip(), req.department.strip(), req.major.strip(), req.class_name.strip(), updated_at, user["id"]
+            req.college.strip(), req.department.strip(), req.major.strip(), req.class_name.strip(), req.entry_grade.strip(), req.enrollment_status.strip(), updated_at, user["id"]
         ))
     return {"message": "个人资料已同步", "updatedAt": china_time(updated_at)}
 
@@ -836,7 +840,7 @@ def admin_users(_admin: None = Depends(require_admin)) -> dict:
     with database_connection() as connection:
         rows = execute(
             connection,
-            """SELECT id, real_name, account, student_id, college, department, major, class_name,
+            """SELECT id, real_name, account, student_id, college, department, major, class_name, entry_grade, enrollment_status,
                status, created_at, last_login_at, last_seen_at, profile_updated_at FROM app_users ORDER BY id DESC"""
         ).fetchall()
     counts = {"total": len(rows), "active": 0, "disabled": 0, "deleted": 0, "online": 0}
