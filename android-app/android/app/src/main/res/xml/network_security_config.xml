@@ -7,4 +7,7 @@
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">jw.whcibe.com</domain>
     </domain-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.1.4.138</domain>
+    </domain-config>
 </network-security-config>

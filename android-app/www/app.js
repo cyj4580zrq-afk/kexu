@@ -11,7 +11,7 @@ const SCHOOL_GRADE_REFERER_PATH = "/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005";
 const SCHOOL_GRADE_DETAIL_PATH = "/cjcx/cjcx_cxCjxqGjh.html";
 // Temporary Aliyun endpoint while the production HTTPS domain is being configured.
 const ACCOUNT_API_BASE = localStorage.getItem("kexu-account-api-base") || "http://47.122.105.185";
-const APP_VERSION = "2.1.8-beta";
+const APP_VERSION = "2.1.9-beta";
 const STORAGE = {
   courses: "campusflow-courses",
   history: "campusflow-sync-history",
@@ -40,7 +40,8 @@ const STORAGE = {
   accountToken: "kexu-account-token",
   username: "campusflow-school-username",
   semester: "campusflow-school-semester",
-  privacyConsent: "campusflow-privacy-consent"
+  privacyConsent: "campusflow-privacy-consent",
+  schoolBase: "campusflow-school-base"
 };
 
 const WEEK_DAYS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
@@ -386,7 +387,7 @@ createApp({
       gradeLoading: false,
       gradeStep: "正在连接教务系统",
       schoolStatus: { type: "unknown", text: "等待连接" },
-      schoolBase: SCHOOL_PUBLIC_BASE,
+      schoolBase: localStorage.getItem(STORAGE.schoolBase) || SCHOOL_PUBLIC_BASE,
       schoolRoute: "default",
       syncForm: {
         username: localStorage.getItem(STORAGE.username) || "",
@@ -1546,7 +1547,7 @@ createApp({
       }
       return profile;
     },
-    async selectSchoolRoute() {
+    async selectSchoolRoute(options = {}) {
       const routes = [
         { base: SCHOOL_INTRANET_BASE, label: "preferred" },
         { base: SCHOOL_PUBLIC_BASE, label: "fallback" }
@@ -1556,11 +1557,13 @@ createApp({
         try {
           await this.httpRequest("GET", `${route.base}${SCHOOL_LOGIN_PATH}`, {
             responseType: "text",
-            connectTimeout: 2800,
-            readTimeout: 4500
+            connectTimeout: 6500,
+            readTimeout: 9000
           });
-          this.schoolBase = route.base;
-          this.schoolRoute = route.label;
+          if (options.commit !== false) {
+            this.schoolBase = route.base;
+            this.schoolRoute = route.label;
+          }
           this.schoolStatus = { type: "online", text: "网络已连接" };
           return route;
         } catch (error) {
@@ -1573,7 +1576,7 @@ createApp({
     },
     async checkSchoolStatus() {
       try {
-        await this.selectSchoolRoute();
+        await this.selectSchoolRoute({ commit: false });
       } catch (_error) {
         this.schoolStatus = { type: "offline", text: "暂不可用" };
       }
@@ -1590,6 +1593,7 @@ createApp({
         setStep(route.step);
         try {
           await this.authenticateSchoolOnCurrentRoute(credentials, setStep);
+          localStorage.setItem(STORAGE.schoolBase, route.base);
           this.schoolStatus = { type: "online", text: "网络已连接" };
           return;
         } catch (error) {
@@ -2086,8 +2090,8 @@ createApp({
         await this.authenticateSchool(credentials, setStep);
         return;
       }
-      setStep("正在验证教务登录状态");
-      await this.selectSchoolRoute();
+      this.schoolBase = localStorage.getItem(STORAGE.schoolBase) || this.schoolBase || SCHOOL_PUBLIC_BASE;
+      setStep("正在使用已验证的教务会话");
     },
     async copyScheduleCode() {
       if (!this.transferCode) return;
