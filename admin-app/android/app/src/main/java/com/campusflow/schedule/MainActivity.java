@@ -93,10 +93,18 @@ public class MainActivity extends BridgeActivity {
         runOnUiThread(() -> {
             if (getBridge() == null || getBridge().getWebView() == null) return;
             getBridge().getWebView().evaluateJavascript(
-                "window.onNativeBackEvent && window.onNativeBackEvent();",
-                null
+                "(function(){return window.onNativeBackEvent ? window.onNativeBackEvent() : false;})()",
+                result -> {
+                    if (!"true".equals(result)) moveTaskToBack(true);
+                }
             );
         });
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
+    public void onBackPressed() {
+        sendBackEvent();
     }
 
     private void publishSystemBarInsets() {
