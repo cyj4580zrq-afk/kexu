@@ -1,6 +1,6 @@
 {
   "name": "kexu-admin",
-  "version": "1.1.2-beta",
+  "version": "1.1.4-beta",
   "private": true,
   "scripts": {
     "sync:android": "cap sync android",

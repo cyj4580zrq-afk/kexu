@@ -864,6 +864,12 @@ def admin_users(_admin: None = Depends(require_admin)) -> dict:
     return {"counts": counts, "timezone": "Asia/Shanghai", "users": users}
 
 
+@app.get("/api/admin/session")
+def admin_session(_admin: None = Depends(require_admin)) -> dict:
+    """Validate an administrator before the heavier user-list query runs."""
+    return {"ok": True, "timezone": "Asia/Shanghai"}
+
+
 @app.post("/api/admin/users/{user_id}/status")
 def update_account_status(user_id: int, req: AccountStatusRequest, _admin: None = Depends(require_admin)) -> dict:
     with database_connection() as connection:

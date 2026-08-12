@@ -702,7 +702,7 @@ createApp({
       if (this.appFeaturesStarted || !this.accountUser) return;
       this.appFeaturesStarted = true;
       this.reportPresence();
-      this.presenceTimer = setInterval(() => this.reportPresence(), 15000);
+      this.presenceTimer = setInterval(() => this.reportPresence(), 8000);
       this.visibilityChangeListener = () => {
         if (!document.hidden) this.reportPresence();
       };
@@ -1335,40 +1335,19 @@ createApp({
         this.gradeForm.username = form.username;
         form.password = "";
 
-        let profile = {};
         try {
-          this.syncStep = "正在读取学籍资料";
-          profile = await this.fetchSchoolProfile();
-        } catch (profileError) {
-          // 资料页未开放或会话失效时，不能阻断用户正常使用课表功能。
-          console.warn("学籍资料暂未读取", profileError);
-        }
-
-        try {
+          // 账号先建立并上报活跃状态，学籍资料在后台补全，避免资料页慢时管理端长期看不到新登录用户。
+          this.syncStep = "正在建立账号身份";
           const payload = await this.accountApiRequest("/api/cloud/identity", {
             method: "POST",
             body: {
-              real_name: profile.realName || `学号${form.username}`,
+              real_name: `学号${form.username}`,
               student_id: form.username,
               privacy_consent: true
             }
           });
           this.rememberAccountSession(payload);
-          if (profile.realName || profile.college || profile.major || profile.className) {
-            await this.accountApiRequest("/api/cloud/profile", {
-              method: "POST",
-              body: {
-                college: profile.college,
-                department: profile.department,
-                major: profile.major,
-                class_name: profile.className,
-                entry_grade: profile.grade,
-                enrollment_status: profile.enrollmentStatus
-              }
-            });
-          }
           this.activateAuthenticatedApp();
-          await this.loadCloudCaches();
         } catch (cloudError) {
           // 停用或令牌失效是服务端的明确拒绝，不能降级为本机授权。
           if (cloudError.status === 401 || cloudError.status === 403) {
@@ -1384,6 +1363,9 @@ createApp({
         this.closeAuthRequired();
         this.activeTab = target;
         this.notify("教务登录成功");
+        // 课表、成绩和学籍信息后置加载，不再阻塞用户进入页面或后台看到登录状态。
+        this.loadCloudCaches().catch(cacheError => console.warn("云端缓存读取失败", cacheError));
+        this.syncStudentProfileForCurrentSession().catch(profileError => console.warn("学籍资料将于下次使用时补全", profileError));
       } catch (error) {
         this.notify(error.message || "教务登录失败，请稍后重试", "error");
       } finally {
