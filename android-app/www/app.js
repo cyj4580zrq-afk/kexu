@@ -11,7 +11,7 @@ const SCHOOL_GRADE_REFERER_PATH = "/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005";
 const SCHOOL_GRADE_DETAIL_PATH = "/cjcx/cjcx_cxCjxqGjh.html";
 // Temporary Aliyun endpoint while the production HTTPS domain is being configured.
 const ACCOUNT_API_BASE = localStorage.getItem("kexu-account-api-base") || "http://47.122.105.185";
-const APP_VERSION = "2.2.2-beta";
+const APP_VERSION = "2.2.3-beta";
 const STORAGE = {
   courses: "campusflow-courses",
   history: "campusflow-sync-history",
@@ -306,6 +306,7 @@ createApp({
       appFeaturesStarted: false,
       schoolAuthorized: false,
       presenceTimer: null,
+      visibilityChangeListener: null,
       authRequiredVisible: false,
       authRequiredTarget: "",
       accountToken: localStorage.getItem(STORAGE.accountToken) || "",
@@ -701,16 +702,22 @@ createApp({
       if (this.appFeaturesStarted || !this.accountUser) return;
       this.appFeaturesStarted = true;
       this.reportPresence();
-      this.presenceTimer = setInterval(() => this.reportPresence(), 60000);
+      this.presenceTimer = setInterval(() => this.reportPresence(), 15000);
+      this.visibilityChangeListener = () => {
+        if (!document.hidden) this.reportPresence();
+      };
+      document.addEventListener("visibilitychange", this.visibilityChangeListener);
       this.autoUpdateTimer = setTimeout(() => this.checkForUpdate({ silent: true }), 1100);
     },
     deactivateAuthenticatedApp() {
       if (this.autoUpdateTimer) clearTimeout(this.autoUpdateTimer);
       if (this.countdownTimer) clearInterval(this.countdownTimer);
       if (this.presenceTimer) clearInterval(this.presenceTimer);
+      if (this.visibilityChangeListener) document.removeEventListener("visibilitychange", this.visibilityChangeListener);
       this.autoUpdateTimer = null;
       this.countdownTimer = null;
       this.presenceTimer = null;
+      this.visibilityChangeListener = null;
       this.appFeaturesStarted = false;
     },
     async loadDailyQuote() {
@@ -1234,9 +1241,22 @@ createApp({
       if (!this.accountToken) return;
       try {
         await this.accountApiRequest("/api/cloud/presence", { method: "POST" });
-      } catch (_error) {
-        // Presence is advisory only; never interrupt normal use when the service is unavailable.
+      } catch (error) {
+        if (error.status === 401 || error.status === 403) this.handleAccountUnavailable(error);
+        // 网络波动不影响本机使用；只有服务明确返回停用或失效才退出授权。
       }
+    },
+    handleAccountUnavailable(error) {
+      if (!this.accountToken && !this.accountUser) return;
+      const message = error.status === 403
+        ? "账号已被后台停用，已退出授权状态"
+        : "账号登录状态已失效，请重新验证后继续使用";
+      this.clearAccountSession();
+      this.schoolAuthorized = false;
+      this.showSchoolReauth = false;
+      this.authRequiredVisible = false;
+      this.activeTab = "schedule";
+      this.notify(message, "error");
     },
     async restoreAccountSession() {
       const cachedUser = readJson(STORAGE.accountUser, null);
@@ -1252,7 +1272,7 @@ createApp({
         this.loadCloudCaches();
       } catch (error) {
         // 仅在服务明确告知令牌无效时才退出；超时或离线时保留本机状态。
-        if (error.status === 401 || error.status === 403) this.clearAccountSession();
+        if (error.status === 401 || error.status === 403) this.handleAccountUnavailable(error);
         else console.warn("课序账号状态将在后台重试", error);
       }
     },
