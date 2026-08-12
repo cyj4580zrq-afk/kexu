@@ -11,7 +11,7 @@ const SCHOOL_GRADE_REFERER_PATH = "/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005";
 const SCHOOL_GRADE_DETAIL_PATH = "/cjcx/cjcx_cxCjxqGjh.html";
 // Temporary Aliyun endpoint while the production HTTPS domain is being configured.
 const ACCOUNT_API_BASE = localStorage.getItem("kexu-account-api-base") || "http://47.122.105.185";
-const APP_VERSION = "2.2.0-beta";
+const APP_VERSION = "2.2.1-beta";
 const STORAGE = {
   courses: "campusflow-courses",
   history: "campusflow-sync-history",
@@ -38,6 +38,7 @@ const STORAGE = {
   countdowns: "campusflow-countdowns",
   dailyQuote: "campusflow-daily-quote",
   accountToken: "kexu-account-token",
+  accountUser: "kexu-account-user",
   username: "campusflow-school-username",
   semester: "campusflow-school-semester",
   privacyConsent: "campusflow-privacy-consent",
@@ -668,6 +669,8 @@ createApp({
     window.onKexuUpdateEvent = payload => this.handleUpdateEvent(payload);
     this.setupNativeBackButton();
     this.initializeGuestApp();
+    // 首屏只依赖本机数据，云端会话在后台安静恢复，避免网络波动阻塞打开应用。
+    this.accountSessionReady = true;
     this.restoreAccountSession();
   },
   beforeUnmount() {
@@ -1196,19 +1199,36 @@ createApp({
       const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
       if (this.accountToken) headers.Authorization = `Bearer ${this.accountToken}`;
       let response;
+      const controller = typeof AbortController === "undefined" ? null : new AbortController();
+      const timeout = controller ? setTimeout(() => controller.abort(), options.timeout || 7000) : null;
       try {
         response = await fetch(`${ACCOUNT_API_BASE}${path}`, {
           method: options.method || "GET",
           headers,
-          body: options.body ? JSON.stringify(options.body) : undefined
+          body: options.body ? JSON.stringify(options.body) : undefined,
+          signal: controller?.signal
         });
-      } catch (_error) {
-        throw new Error("暂时无法连接课序账号服务，请稍后重试");
+      } catch (error) {
+        const networkError = new Error(error?.name === "AbortError" ? "账号服务响应较慢，请稍后重试" : "暂时无法连接课序账号服务，请稍后重试");
+        networkError.network = true;
+        throw networkError;
+      } finally {
+        if (timeout) clearTimeout(timeout);
       }
       let payload = {};
       try { payload = await response.json(); } catch (_error) { payload = {}; }
-      if (!response.ok) throw new Error(payload.detail || "账号服务请求失败");
+      if (!response.ok) {
+        const requestError = new Error(payload.detail || "账号服务请求失败");
+        requestError.status = response.status;
+        throw requestError;
+      }
       return payload;
+    },
+    rememberAccountSession(payload) {
+      this.accountToken = payload.token || this.accountToken;
+      this.accountUser = normalizeAccountUser(payload.user || this.accountUser);
+      if (this.accountToken) localStorage.setItem(STORAGE.accountToken, this.accountToken);
+      if (this.accountUser) localStorage.setItem(STORAGE.accountUser, JSON.stringify(this.accountUser));
     },
     async reportPresence() {
       if (!this.accountToken) return;
@@ -1219,22 +1239,29 @@ createApp({
       }
     },
     async restoreAccountSession() {
-      if (!this.accountToken) {
-        this.accountSessionReady = true;
-        return;
-      }
-      try {
-        const payload = await this.accountApiRequest("/api/auth/me");
-        this.accountUser = normalizeAccountUser(payload.user);
+      const cachedUser = readJson(STORAGE.accountUser, null);
+      if (cachedUser) {
+        this.accountUser = normalizeAccountUser(cachedUser);
         this.activateAuthenticatedApp();
-        await this.loadCloudCaches();
-      } catch (_error) {
-        this.accountToken = "";
-        this.accountUser = null;
-        localStorage.removeItem(STORAGE.accountToken);
-      } finally {
-        this.accountSessionReady = true;
       }
+      if (!this.accountToken) return;
+      try {
+        const payload = await this.accountApiRequest("/api/auth/me", { timeout: 2400 });
+        this.rememberAccountSession(payload);
+        this.activateAuthenticatedApp();
+        this.loadCloudCaches();
+      } catch (error) {
+        // 仅在服务明确告知令牌无效时才退出；超时或离线时保留本机状态。
+        if (error.status === 401 || error.status === 403) this.clearAccountSession();
+        else console.warn("课序账号状态将在后台重试", error);
+      }
+    },
+    clearAccountSession() {
+      this.deactivateAuthenticatedApp();
+      this.accountToken = "";
+      this.accountUser = null;
+      localStorage.removeItem(STORAGE.accountToken);
+      localStorage.removeItem(STORAGE.accountUser);
     },
     async createCloudIdentity() {
       const form = this.schoolOnboardingForm;
@@ -1255,10 +1282,8 @@ createApp({
             privacy_consent: true
           }
         });
-        this.accountToken = payload.token;
-        this.accountUser = normalizeAccountUser(payload.user);
+        this.rememberAccountSession(payload);
         this.accountSessionReady = true;
-        localStorage.setItem(STORAGE.accountToken, payload.token);
         localStorage.setItem(STORAGE.username, form.username);
         this.syncForm.username = form.username;
         this.gradeForm.username = form.username;
@@ -1312,9 +1337,7 @@ createApp({
               privacy_consent: true
             }
           });
-          this.accountToken = payload.token;
-          this.accountUser = normalizeAccountUser(payload.user);
-          localStorage.setItem(STORAGE.accountToken, payload.token);
+          this.rememberAccountSession(payload);
           if (profile.realName || profile.college || profile.major || profile.className) {
             await this.accountApiRequest("/api/cloud/profile", {
               method: "POST",
@@ -1344,7 +1367,7 @@ createApp({
     async loadCloudCache(type, semester) {
       if (!this.accountToken || !semester) return null;
       try {
-        const payload = await this.accountApiRequest(`/api/cloud/${type}/${semester}`);
+        const payload = await this.accountApiRequest(`/api/cloud/${type}/${semester}`, { timeout: 2500 });
         return payload.cache;
       } catch (error) {
         console.warn(`云端${type}缓存读取失败`, error);
@@ -1398,12 +1421,10 @@ createApp({
             privacy_consent: true
           }
         });
-        this.accountToken = payload.token;
-        this.accountUser = normalizeAccountUser(payload.user);
+        this.rememberAccountSession(payload);
         this.accountSessionReady = true;
         this.activeTab = "schedule";
         this.activateAuthenticatedApp();
-        localStorage.setItem(STORAGE.accountToken, payload.token);
         this.accountRegisterForm.password = "";
         this.notify("注册成功，账号已立即启用");
       } catch (error) {
@@ -1420,12 +1441,10 @@ createApp({
           method: "POST",
           body: this.accountLoginForm
         });
-        this.accountToken = payload.token;
-        this.accountUser = normalizeAccountUser(payload.user);
+        this.rememberAccountSession(payload);
         this.accountSessionReady = true;
         this.activeTab = "schedule";
         this.activateAuthenticatedApp();
-        localStorage.setItem(STORAGE.accountToken, payload.token);
         this.accountLoginForm.password = "";
         this.notify("登录成功");
       } catch (error) {
@@ -1435,13 +1454,10 @@ createApp({
       }
     },
     logoutKexuAccount() {
-      this.deactivateAuthenticatedApp();
-      this.accountToken = "";
-      this.accountUser = null;
+      this.clearAccountSession();
       this.accountSessionReady = true;
       this.activeTab = "schedule";
       this.accountDeletePassword = "";
-      localStorage.removeItem(STORAGE.accountToken);
       this.notify("已退出课序账号", "info");
     },
     async deleteKexuAccount() {
@@ -1555,6 +1571,18 @@ createApp({
       if (!profile.realName && !profile.college && !profile.major && !profile.className) {
         throw new Error("教务系统未返回可用的学籍资料");
       }
+      // 个人信息页中的姓名是后台账号资料的权威来源，避免一直保留“学号xxxx”的占位名。
+      if (profile.realName) {
+        const identity = await this.accountApiRequest("/api/cloud/identity", {
+          method: "POST",
+          body: {
+            real_name: profile.realName,
+            student_id: this.syncForm.username || this.gradeForm.username,
+            privacy_consent: true
+          }
+        });
+        this.rememberAccountSession(identity);
+      }
       const payload = await this.accountApiRequest("/api/cloud/profile", {
         method: "POST",
         body: {
@@ -1566,8 +1594,22 @@ createApp({
           enrollment_status: profile.enrollmentStatus
         }
       });
-      if (profile.realName && this.accountUser) this.accountUser.realName = profile.realName;
+      if (profile.realName && this.accountUser) {
+        this.accountUser.realName = profile.realName;
+        localStorage.setItem(STORAGE.accountUser, JSON.stringify(this.accountUser));
+      }
       return payload;
+    },
+    isSchoolSessionExpired(error) {
+      const status = Number(error?.status);
+      return status === 401 || status === 901 || /(?:\b901\b|登录状态已失效|会话已失效|请重新登录|login_slogin)/i.test(String(error?.message || ""));
+    },
+    markSchoolSessionExpired() {
+      this.showSchoolReauth = true;
+      this.syncForm.password = "";
+      this.gradeForm.password = "";
+      this.schoolStatus = { type: "offline", text: "需重新验证" };
+      return "教务会话已失效，请输入教务密码重新验证后重试";
     },
     async selectSchoolRoute(options = {}) {
       const routes = [
@@ -1717,8 +1759,11 @@ createApp({
         this.notify(`已同步 ${newCourses.length} 门课程`);
         this.activeTab = "schedule";
       } catch (error) {
-        this.schoolStatus = { type: "offline", text: error.status === 401 ? "登录失败" : "连接失败" };
-        const message = error.status === 401
+        const sessionExpired = !this.syncForm.password && this.isSchoolSessionExpired(error);
+        this.schoolStatus = { type: "offline", text: sessionExpired ? "需重新验证" : (error.status === 401 ? "登录失败" : "连接失败") };
+        const message = sessionExpired
+          ? this.markSchoolSessionExpired()
+          : error.status === 401
           ? error.message
           : `${error.message || "教务系统当前无法连接"}，本地课表已保留`;
         this.notify(message, "error");
@@ -1729,33 +1774,35 @@ createApp({
     },
     async syncGradesFromSchool() {
       const semesterLabel = this.gradeSemesterLabel(this.gradeForm.semester);
-      const cachedGrades = this.grades.filter(grade => this.gradeMatchesSemester(grade, this.gradeForm.semester));
-      if (cachedGrades.length) {
-        this.selectedGradeSemester = semesterLabel;
-        this.gradeSyncVisible = false;
-        this.notify(`已显示本地保存的 ${cachedGrades.length} 门成绩`);
-        return;
-      }
-      const cloudCache = await this.loadCloudCache("grades", this.gradeForm.semester);
-      if (cloudCache?.data?.length) {
-        this.replaceGradesForSemester(this.gradeForm.semester, cloudCache.data);
-        this.saveGradeSnapshot(this.gradeForm.semester, cloudCache.data);
-        this.selectedGradeSemester = semesterLabel;
-        this.gradeSyncVisible = false;
-        this.notify(`已从云端缓存读取 ${cloudCache.data.length} 门成绩`);
-        return;
-      }
-      if (!this.privacyConsent) {
-        this.notify("请先阅读并同意隐私说明", "warning");
-        this.privacyVisible = true;
-        return;
-      }
-      if (!this.gradeForm.username) {
-        this.notify("请填写学号", "warning");
-        return;
-      }
       this.gradeLoading = true;
+      this.gradeStep = "正在检查已保存的成绩";
       try {
+        const cachedGrades = this.grades.filter(grade => this.gradeMatchesSemester(grade, this.gradeForm.semester));
+        if (cachedGrades.length) {
+          this.selectedGradeSemester = semesterLabel;
+          this.gradeSyncVisible = false;
+          this.notify(`已显示本地保存的 ${cachedGrades.length} 门成绩`);
+          return;
+        }
+        this.gradeStep = "正在检查云端缓存";
+        const cloudCache = await this.loadCloudCache("grades", this.gradeForm.semester);
+        if (cloudCache?.data?.length) {
+          this.replaceGradesForSemester(this.gradeForm.semester, cloudCache.data);
+          this.saveGradeSnapshot(this.gradeForm.semester, cloudCache.data);
+          this.selectedGradeSemester = semesterLabel;
+          this.gradeSyncVisible = false;
+          this.notify(`已从云端缓存读取 ${cloudCache.data.length} 门成绩`);
+          return;
+        }
+        if (!this.privacyConsent) {
+          this.notify("请先阅读并同意隐私说明", "warning");
+          this.privacyVisible = true;
+          return;
+        }
+        if (!this.gradeForm.username) {
+          this.notify("请填写学号", "warning");
+          return;
+        }
         await this.prepareSchoolSession(this.gradeForm, step => { this.gradeStep = step; });
         this.gradeStep = "正在查询成绩";
         const [startYear, _endYear, term] = this.gradeForm.semester.split("-");
@@ -1771,7 +1818,12 @@ createApp({
         this.gradeSyncVisible = false;
         this.notify(`已保存 ${newGrades.length} 条成绩`);
       } catch (error) {
-        const message = error.status === 401 ? error.message : `${error.message || "教务系统当前无法连接"}，已保存的成绩不受影响`;
+        const sessionExpired = !this.gradeForm.password && this.isSchoolSessionExpired(error);
+        const message = sessionExpired
+          ? this.markSchoolSessionExpired()
+          : error.status === 401
+          ? error.message
+          : `${error.message || "教务系统当前无法连接"}，已保存的成绩不受影响`;
         this.notify(message, "error");
       } finally {
         this.gradeLoading = false;
@@ -1825,7 +1877,11 @@ createApp({
         });
         const payload = responseData(response);
         const rows = payload && (payload.items || payload.rows || payload.data || []);
-        if (!Array.isArray(rows)) throw new Error("教务系统返回了无法识别的成绩数据");
+        if (!Array.isArray(rows)) {
+          const error = new Error("教务登录状态已失效，请重新输入密码后查询");
+          error.status = Number(payload?.status || payload?.code) === 901 ? 901 : 401;
+          throw error;
+        }
         const pageSignature = rows.map(item => item.key || item.jxb_id || item.kch || JSON.stringify(item)).join("|");
         if (pageSignature && seenPages.has(pageSignature)) break;
         seenPages.add(pageSignature);
@@ -1954,7 +2010,8 @@ createApp({
         grade.detailFetched = components.length > 0;
         this.persistGrades();
       } catch (error) {
-        this.notify(`分项成绩读取失败：${error.status || error.message || "教务系统未返回详情"}`, "warning");
+        const sessionExpired = !this.gradeForm.password && this.isSchoolSessionExpired(error);
+        this.notify(sessionExpired ? this.markSchoolSessionExpired() : `分项成绩读取失败：${error.status || error.message || "教务系统未返回详情"}`, "warning");
       } finally {
         this.gradeDetailLoading = false;
       }
