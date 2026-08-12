@@ -280,20 +280,21 @@
 
           <button type="button" class="reauth-trigger" @click="showSchoolReauth = !showSchoolReauth">{{ showSchoolReauth ? '收起重新验证' : '教务会话失效？重新验证' }}</button>
           <template v-if="showSchoolReauth">
-          <label class="field-label" for="student-password">教务系统密码</label>
-          <div class="input-shell">
-            <app-icon name="LockKeyhole" :size="19"></app-icon>
-            <input
-              id="student-password"
-              v-model="syncForm.password"
-              :type="showPassword ? 'text' : 'password'"
-              autocomplete="current-password"
-              placeholder="请输入密码"
-            >
-            <button type="button" class="input-icon" :aria-label="showPassword ? '隐藏密码' : '显示密码'" @click="showPassword = !showPassword">
-              <app-icon :name="showPassword ? 'EyeOff' : 'Eye'" :size="19"></app-icon>
-            </button>
-          </div>
+            <label class="field-label" for="student-password">教务系统密码</label>
+            <div class="input-shell">
+              <app-icon name="LockKeyhole" :size="19"></app-icon>
+              <input
+                id="student-password"
+                v-model="syncForm.password"
+                :type="showPassword ? 'text' : 'password'"
+                autocomplete="current-password"
+                placeholder="请输入密码"
+              >
+              <button type="button" class="input-icon" :aria-label="showPassword ? '隐藏密码' : '显示密码'" @click="showPassword = !showPassword">
+                <app-icon :name="showPassword ? 'EyeOff' : 'Eye'" :size="19"></app-icon>
+              </button>
+            </div>
+          </template>
 
           <label class="field-label">学期</label>
           <button type="button" class="input-shell semester-trigger" @click="openSemesterSheet('course')">
@@ -482,7 +483,6 @@
               <app-icon name="ChevronRight" :size="18"></app-icon>
             </button>
           </div>
-          </template>
           <div class="account-danger">
             <h2>删除云端身份</h2>
             <p>会删除云端的姓名、学号、课表与成绩缓存；本机数据不受影响。</p>
@@ -738,7 +738,7 @@
           </button>
         </div>
 
-        <p class="version-text">课序 2.1.2 Beta</p>
+        <p class="version-text">课序 2.1.5 Beta</p>
       </section>
     </main>
 

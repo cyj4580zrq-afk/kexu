@@ -150,7 +150,13 @@ function normalizeStoredGrade(grade) {
     ...item,
     components: Array.isArray(item.components) ? item.components : [],
     remote: item.remote && typeof item.remote === "object" ? item.remote : {},
-    detailFetched: Boolean(item.detailFetched)
+    detailFetched: Boolean(item.detailFetched),
+    id: item.id || item.jxb_id || item.jxbid || `${item.semester || item.xnm || "legacy"}-${item.name || item.kcmc || "grade"}-${item.credit || item.xf || "0"}`,
+    name: item.name || item.kcmc || "未命名课程",
+    score: item.score ?? item.cj ?? item.zcj ?? "--",
+    credit: item.credit ?? item.xf ?? "--",
+    gpa: item.gpa ?? item.jd ?? "--",
+    teacher: item.teacher || item.jsxm || item.xm || "教师信息待同步"
   };
 }
 
