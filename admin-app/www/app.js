@@ -281,13 +281,17 @@ document.querySelector("#loginForm").addEventListener("submit", async (event) =>
   setButtonLoading(loginButton, true, "正在验证…", "进入管理后台");
   loginStatus.textContent = "正在连接账号服务…";
   try {
-    await apiRequest("/api/admin/session", { timeout: 4500 });
+    // 管理员密码使用较高强度校验，移动网络加上数据库唤醒时需要比普通刷新更长的等待窗口。
+    await apiRequest("/api/admin/session", { timeout: 15000 });
     localStorage.setItem("kexu-admin-server", state.base);
     enterDashboard();
     loadUsers();
   } catch (error) {
     state.authorization = "";
-    loginError.textContent = `登录失败：${error.message}`;
+    const message = /timeout/i.test(String(error?.message || ""))
+      ? "管理员验证超时，请检查网络后重试"
+      : error.message;
+    loginError.textContent = `登录失败：${message}`;
   } finally {
     setButtonLoading(loginButton, false, "正在验证…", "进入管理后台");
     loginStatus.textContent = "";
