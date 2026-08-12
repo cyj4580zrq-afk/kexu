@@ -285,6 +285,8 @@ createApp({
       accountSessionReady: false,
       appFeaturesStarted: false,
       presenceTimer: null,
+      authRequiredVisible: false,
+      authRequiredTarget: "",
       accountToken: localStorage.getItem(STORAGE.accountToken) || "",
       accountUser: null,
       accountPrivacyConsent: false,
@@ -388,6 +390,16 @@ createApp({
     };
   },
   computed: {
+    authRequiredFeatureName() {
+      return ({
+        allCourses: "课表",
+        grades: "成绩",
+        settings: "我的",
+        sync: "课表同步",
+        history: "同步记录",
+        countdowns: "目标倒计时"
+      })[this.authRequiredTarget] || "该功能";
+    },
     dayOptions() {
       return [
         { value: "全部", short: "全部" },
@@ -635,6 +647,7 @@ createApp({
     window.onNativeBackEvent = () => this.handleBackButton();
     window.onKexuUpdateEvent = payload => this.handleUpdateEvent(payload);
     this.setupNativeBackButton();
+    this.initializeGuestApp();
     this.restoreAccountSession();
   },
   beforeUnmount() {
@@ -651,17 +664,21 @@ createApp({
     else this.systemThemeQuery.removeListener(this.applyTheme);
   },
   methods: {
+    initializeGuestApp() {
+      this.initializePersistentStorage();
+      this.checkSchoolStatus();
+      this.loadDailyQuote();
+      if (!this.countdownTimer) {
+        this.countdownTimer = setInterval(() => {
+          this.countdownNow = Date.now();
+        }, 60000);
+      }
+    },
     activateAuthenticatedApp() {
       if (this.appFeaturesStarted || !this.accountUser) return;
       this.appFeaturesStarted = true;
-      this.initializePersistentStorage();
-      this.checkSchoolStatus();
       this.reportPresence();
       this.presenceTimer = setInterval(() => this.reportPresence(), 60000);
-      this.loadDailyQuote();
-      this.countdownTimer = setInterval(() => {
-        this.countdownNow = Date.now();
-      }, 60000);
       this.autoUpdateTimer = setTimeout(() => this.checkForUpdate({ silent: true }), 1100);
     },
     deactivateAuthenticatedApp() {
@@ -723,10 +740,20 @@ createApp({
       });
     },
     openTab(tab) {
-      if (!this.accountUser) return;
+      if (!this.accountUser && tab !== "schedule") {
+        this.authRequiredTarget = tab;
+        this.authRequiredVisible = true;
+        this.tapFeedback();
+        return;
+      }
       if (this.activeTab === tab) return;
       this.activeTab = tab;
       this.tapFeedback();
+    },
+    closeAuthRequired() {
+      this.authRequiredVisible = false;
+      this.authRequiredTarget = "";
+      this.schoolOnboardingForm.password = "";
     },
     returnToHome() {
       if (this.activeTab === "schedule") return;
@@ -793,11 +820,7 @@ createApp({
         this.weekSheetVisible = false;
         return;
       }
-      if (this.accountSessionReady && !this.accountUser) {
-        this.exitConfirmVisible = true;
-        this.tapFeedback(14);
-        return;
-      }
+      if (this.authRequiredVisible) return this.closeAuthRequired();
       if (this.returnToParentTab()) return;
       if (this.activeTab !== "schedule") {
         this.returnToHome();
@@ -1228,6 +1251,44 @@ createApp({
         await this.loadCloudCaches();
       } catch (error) {
         this.notify(error.message || "教务授权失败，请稍后重试", "error");
+      } finally {
+        this.accountLoading = false;
+        this.syncStep = "正在连接教务系统";
+      }
+    },
+    async loginWithSchoolAccount() {
+      const form = this.schoolOnboardingForm;
+      if (!form.username || !form.password) return this.notify("请输入教务系统学号和密码", "warning");
+      if (!this.accountPrivacyConsent) return this.notify("请先同意账号管理与同步说明", "warning");
+      this.accountLoading = true;
+      this.syncStep = "正在验证教务身份";
+      try {
+        await this.authenticateSchool(form, step => { this.syncStep = step; });
+        localStorage.setItem(STORAGE.username, form.username);
+        this.syncForm.username = form.username;
+        this.gradeForm.username = form.username;
+        form.password = "";
+        const target = this.authRequiredTarget || "allCourses";
+        this.closeAuthRequired();
+        this.activeTab = target;
+        this.notify("教务登录成功");
+
+        try {
+          const payload = await this.accountApiRequest("/api/cloud/identity", {
+            method: "POST",
+            body: { real_name: `学号${form.username}`, student_id: form.username, privacy_consent: true }
+          });
+          this.accountToken = payload.token;
+          this.accountUser = normalizeAccountUser(payload.user);
+          localStorage.setItem(STORAGE.accountToken, payload.token);
+          this.activateAuthenticatedApp();
+          await this.loadCloudCaches();
+        } catch (cloudError) {
+          console.warn("云端身份暂不可用", cloudError);
+          this.notify("已进入本机功能，后台同步将在服务恢复后重试", "warning");
+        }
+      } catch (error) {
+        this.notify(error.message || "教务登录失败，请稍后重试", "error");
       } finally {
         this.accountLoading = false;
         this.syncStep = "正在连接教务系统";

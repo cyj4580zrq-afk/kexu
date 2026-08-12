@@ -16,28 +16,6 @@
       <small>课序</small>
     </section>
 
-    <section v-else-if="!accountUser" class="auth-gate">
-      <header class="auth-gate-header">
-        <span class="auth-logo">课</span>
-        <div><p>WHCIBE</p><h1>登录后开始使用</h1></div>
-      </header>
-      <section class="auth-gate-copy">
-        <h2>你的课程，由你掌握</h2>
-        <p>使用教务系统学号完成首次授权后，即可使用课表、成绩、倒计时和全部设置。</p>
-      </section>
-      <form class="form-stack account-form auth-gate-form" @submit.prevent="createCloudIdentity">
-        <label class="field-label" for="gate-real-name">真实姓名</label>
-        <div class="input-shell"><app-icon name="ContactRound" :size="19"></app-icon><input id="gate-real-name" v-model.trim="schoolOnboardingForm.realName" maxlength="30" autocomplete="name" placeholder="必填，由本人如实填写"></div>
-        <label class="field-label" for="gate-student-id">教务系统学号</label>
-        <div class="input-shell"><app-icon name="UserRound" :size="19"></app-icon><input id="gate-student-id" v-model.trim="schoolOnboardingForm.username" maxlength="40" autocomplete="username" placeholder="请输入学号"></div>
-        <label class="field-label" for="gate-school-password">教务系统密码</label>
-        <div class="input-shell"><app-icon name="LockKeyhole" :size="19"></app-icon><input id="gate-school-password" v-model="schoolOnboardingForm.password" type="password" maxlength="128" autocomplete="current-password" placeholder="仅用于本机完成教务授权"></div>
-        <label class="account-consent"><input v-model="accountPrivacyConsent" type="checkbox"><span>我同意将姓名、学号、课表、成绩及同步时间保存至云端，用于跨设备查看和缓存同步。</span></label>
-        <button class="primary-button" type="submit" :disabled="accountLoading"><app-icon name="LogIn" :size="18"></app-icon>{{ accountLoading ? syncStep : '授权并进入课序' }}</button>
-      </form>
-      <div class="account-separation auth-gate-note"><app-icon name="ShieldCheck" :size="18"></app-icon><p><strong>教务密码不会上传至课序服务器</strong><br>课表与成绩仅在你同意后用于云端缓存。</p></div>
-    </section>
-
     <main
       v-else
       class="app-shell"
@@ -742,7 +720,7 @@
       </section>
     </main>
 
-    <nav v-if="accountUser" class="bottom-nav" aria-label="应用导航">
+    <nav v-if="accountSessionReady" class="bottom-nav" aria-label="应用导航">
       <button v-for="tab in tabs" :key="tab.value" type="button" :class="{ active: activeTab === tab.value || (tab.value === 'settings' && settingsChildTabs.includes(activeTab)) }" @click="openTab(tab.value)">
         <app-icon :name="tab.icon" :size="activeTab === tab.value || (tab.value === 'settings' && settingsChildTabs.includes(activeTab)) ? 22 : 20"></app-icon>
         <span>{{ tab.label }}</span>
@@ -756,6 +734,25 @@
         <div class="week-grid">
           <button v-for="week in 30" :key="week" type="button" :class="{ active: (weekSheetMode === 'current' ? currentWeek : selectedWeek) === week }" @click="selectWeek(week)">第 {{ week }} 周</button>
         </div>
+      </section>
+    </div>
+
+    <div v-if="authRequiredVisible" class="sheet-overlay auth-required-overlay" @click.self="closeAuthRequired">
+      <section class="sheet auth-required-sheet" role="dialog" aria-modal="true" aria-labelledby="auth-required-title">
+        <span class="sheet-handle"></span>
+        <button class="sheet-close" type="button" aria-label="关闭登录" @click="closeAuthRequired"><app-icon name="X" :size="20"></app-icon></button>
+        <p class="brand-line">WHCIBE</p>
+        <h2 id="auth-required-title">登录后继续使用</h2>
+        <p class="sheet-subtitle">使用教务系统学号验证后，即可进入{{ authRequiredFeatureName }}。</p>
+        <form class="form-stack account-form" @submit.prevent="loginWithSchoolAccount">
+          <label class="field-label" for="feature-student-id">教务系统学号</label>
+          <div class="input-shell"><app-icon name="UserRound" :size="19"></app-icon><input id="feature-student-id" v-model.trim="schoolOnboardingForm.username" maxlength="40" autocomplete="username" placeholder="请输入学号"></div>
+          <label class="field-label" for="feature-school-password">教务系统密码</label>
+          <div class="input-shell"><app-icon name="LockKeyhole" :size="19"></app-icon><input id="feature-school-password" v-model="schoolOnboardingForm.password" type="password" maxlength="128" autocomplete="current-password" placeholder="仅用于本机教务验证"></div>
+          <label class="account-consent"><input v-model="accountPrivacyConsent" type="checkbox"><span>我同意将学号及本人主动同步的课表、成绩和同步时间用于账号管理与云端缓存。</span></label>
+          <button class="primary-button" type="submit" :disabled="accountLoading"><app-icon :name="accountLoading ? 'LoaderCircle' : 'LogIn'" :size="18" :class="{ spinning: accountLoading }"></app-icon>{{ accountLoading ? syncStep : '登录并继续' }}</button>
+        </form>
+        <div class="account-separation auth-gate-note"><app-icon name="ShieldCheck" :size="18"></app-icon><p><strong>教务密码不会上传或保存到课序服务器</strong><br>后台同步失败不会影响本机继续使用。</p></div>
       </section>
     </div>
 
