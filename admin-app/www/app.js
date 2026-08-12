@@ -46,6 +46,7 @@ function messageFrom(response, fallback) {
 
 function requestError(error, fallback) {
   if (error?.name === "AbortError") return new Error("服务响应较慢，请检查网络后重试");
+  if (/cleartext|network|failed to fetch/i.test(String(error?.message || ""))) return new Error("无法连接账号服务，请确认网络正常后重试");
   return error instanceof Error ? error : new Error(fallback);
 }
 
@@ -53,11 +54,25 @@ async function apiRequest(path, options = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.timeout || 7000);
   try {
-    const response = await fetch(`${state.base}${path}`, {
-      ...options,
-      headers: { ...authHeader(), ...(options.headers || {}) },
-      signal: controller.signal
-    });
+    const headers = { ...authHeader(), ...(options.headers || {}) };
+    const url = `${state.base}${path}`;
+    const nativeHttp = window.Capacitor?.isNativePlatform() && window.capacitorExports?.CapacitorHttp;
+    if (nativeHttp) {
+      const response = await nativeHttp.request({
+        url,
+        method: options.method || "GET",
+        headers,
+        data: options.body ? JSON.parse(options.body) : undefined,
+        responseType: "json",
+        connectTimeout: options.timeout || 7000,
+        readTimeout: options.timeout || 7000
+      });
+      if (response.status < 200 || response.status >= 300) {
+        throw new Error(response.data?.detail || "请求失败");
+      }
+      return response.data;
+    }
+    const response = await fetch(url, { ...options, headers, signal: controller.signal });
     if (!response.ok) throw new Error(await messageFrom(response, "请求失败"));
     return response.json();
   } catch (error) {

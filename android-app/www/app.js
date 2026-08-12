@@ -1536,7 +1536,15 @@ createApp({
         params: options.params,
         data: options.data
       };
-      const response = await http.request(request);
+      let response;
+      try {
+        response = await http.request(request);
+      } catch (error) {
+        if (/CertPathValidatorException|Trust anchor|certificate/i.test(String(error?.message || error))) {
+          throw new Error("教务系统安全证书暂不可验证。请连接校园网后重试，或稍后等待学校恢复证书服务。");
+        }
+        throw error;
+      }
       if (response.status < 200 || response.status >= 400) {
         const error = new Error(`教务系统返回异常（${response.status}）`);
         error.status = response.status;
