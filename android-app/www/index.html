@@ -385,12 +385,6 @@
 
         <div class="settings-group">
           <h2>常用功能</h2>
-          <button type="button" class="setting-row" @click="openTab('account')">
-            <span class="setting-icon blue"><app-icon name="CircleUserRound" :size="19"></app-icon></span>
-            <span><strong>云端身份</strong><small>{{ accountUser ? `${accountUser.realName || '已授权用户'} · ${accountUser.studentId || accountUser.account || ''}` : '用教务学号授权后自动创建' }}</small></span>
-            <em v-if="accountUser" class="account-state">正常</em>
-            <app-icon name="ChevronRight" :size="18"></app-icon>
-          </button>
           <button type="button" class="setting-row" @click="openTab('sync')">
             <span class="setting-icon blue"><app-icon name="RefreshCw" :size="19"></app-icon></span>
             <span><strong>导入课表</strong><small>{{ lastSyncText }}</small></span>
@@ -437,7 +431,7 @@
           </button>
         </div>
 
-        <p class="version-text">课序 2.2.0 Beta</p>
+        <p class="version-text">课序 2.2.2 Beta</p>
       </section>
 
       <section v-show="activeTab === 'account'" class="page standard-page account-page">
@@ -460,11 +454,6 @@
               <span><strong>退出本机</strong><small>不会删除本机课程和成绩</small></span>
               <app-icon name="ChevronRight" :size="18"></app-icon>
             </button>
-          </div>
-          <div class="account-danger">
-            <h2>删除云端身份</h2>
-            <p>会删除云端的姓名、学号、课表与成绩缓存；本机数据不受影响。</p>
-            <button type="button" class="danger-button" :disabled="accountLoading" @click="deleteCloudIdentity"><app-icon name="UserRoundX" :size="18"></app-icon>删除云端身份</button>
           </div>
         </template>
 
@@ -745,16 +734,16 @@
           <span class="auth-required-badge"><app-icon name="GraduationCap" :size="19"></app-icon></span>
           <div><p class="brand-line">WHCIBE · 教务授权</p><h2 id="auth-required-title">登录以继续</h2></div>
         </div>
-        <p class="sheet-subtitle">验证后可使用{{ authRequiredFeatureName }}，本次会话内无需重复输入密码。</p>
+        <p class="sheet-subtitle">验证后即可使用{{ authRequiredFeatureName }}。</p>
         <form class="form-stack account-form" @submit.prevent="loginWithSchoolAccount">
           <label class="field-label" for="feature-student-id">学号</label>
           <div class="input-shell"><app-icon name="UserRound" :size="19"></app-icon><input id="feature-student-id" v-model.trim="schoolOnboardingForm.username" maxlength="40" autocomplete="username" placeholder="输入教务系统学号"></div>
           <label class="field-label" for="feature-school-password">教务密码</label>
           <div class="input-shell"><app-icon name="LockKeyhole" :size="19"></app-icon><input id="feature-school-password" v-model="schoolOnboardingForm.password" type="password" maxlength="128" autocomplete="current-password" placeholder="仅用于本机身份验证"></div>
-          <label class="account-consent"><input v-model="accountPrivacyConsent" type="checkbox"><span>我已阅读并同意将学号与本人主动同步的数据用于账号管理及云端缓存。</span></label>
+          <label class="account-consent"><input v-model="accountPrivacyConsent" type="checkbox"><span>我同意同步本人主动查询的数据，用于账号管理与云端缓存。</span></label>
           <button class="primary-button" type="submit" :disabled="accountLoading"><app-icon :name="accountLoading ? 'LoaderCircle' : 'LogIn'" :size="18" :class="{ spinning: accountLoading }"></app-icon>{{ accountLoading ? syncStep : '登录并继续' }}</button>
         </form>
-        <div class="account-separation auth-gate-note"><app-icon name="ShieldCheck" :size="18"></app-icon><p><strong>密码只用于本机验证，不会上传或保存</strong><br>授权后可随时在“我的”中管理本地数据。</p></div>
+        <p class="auth-gate-privacy"><app-icon name="ShieldCheck" :size="15"></app-icon>教务密码仅用于本机验证，不会上传或保存。</p>
       </section>
     </div>
 

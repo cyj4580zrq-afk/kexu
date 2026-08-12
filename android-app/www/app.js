@@ -11,7 +11,7 @@ const SCHOOL_GRADE_REFERER_PATH = "/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005";
 const SCHOOL_GRADE_DETAIL_PATH = "/cjcx/cjcx_cxCjxqGjh.html";
 // Temporary Aliyun endpoint while the production HTTPS domain is being configured.
 const ACCOUNT_API_BASE = localStorage.getItem("kexu-account-api-base") || "http://47.122.105.185";
-const APP_VERSION = "2.2.1-beta";
+const APP_VERSION = "2.2.2-beta";
 const STORAGE = {
   courses: "campusflow-courses",
   history: "campusflow-sync-history",
@@ -1367,7 +1367,7 @@ createApp({
     async loadCloudCache(type, semester) {
       if (!this.accountToken || !semester) return null;
       try {
-        const payload = await this.accountApiRequest(`/api/cloud/${type}/${semester}`, { timeout: 2500 });
+        const payload = await this.accountApiRequest(`/api/cloud/${type}/${semester}`, { timeout: 900 });
         return payload.cache;
       } catch (error) {
         console.warn(`云端${type}缓存读取失败`, error);
@@ -1468,22 +1468,6 @@ createApp({
         const payload = await this.accountApiRequest("/api/auth/account", {
           method: "DELETE",
           body: { password: this.accountDeletePassword }
-        });
-        this.logoutKexuAccount();
-        this.notify(payload.message);
-      } catch (error) {
-        this.notify(error.message, "error");
-      } finally {
-        this.accountLoading = false;
-      }
-    },
-    async deleteCloudIdentity() {
-      if (!window.confirm("确定删除云端身份和全部云端课表、成绩缓存吗？本机数据不会删除。")) return;
-      this.accountLoading = true;
-      try {
-        const payload = await this.accountApiRequest("/api/cloud/identity", {
-          method: "DELETE",
-          body: { confirmation: true }
         });
         this.logoutKexuAccount();
         this.notify(payload.message);
@@ -1718,11 +1702,6 @@ createApp({
       this.schoolStatus = { type: "unknown", text: "连接中" };
       try {
         await this.prepareSchoolSession(this.syncForm, step => { this.syncStep = step; });
-        try {
-          await this.syncStudentProfileForCurrentSession();
-        } catch (profileError) {
-          console.warn("学籍资料同步稍后重试", profileError);
-        }
         const endpoints = this.schoolEndpoints();
 
         this.syncStep = "正在获取课程";
@@ -1749,7 +1728,11 @@ createApp({
         this.courses = newCourses;
         this.persistCourses();
         this.saveSnapshot("教务系统同步", this.syncForm.semester, newCourses);
-        await this.saveCloudCache("courses", this.syncForm.semester, newCourses);
+        // 本机课表已写入后立即返回，资料与云端备份在后台完成，不阻塞用户。
+        this.saveCloudCache("courses", this.syncForm.semester, newCourses);
+        this.syncStudentProfileForCurrentSession().catch(profileError => {
+          console.warn("学籍资料同步稍后重试", profileError);
+        });
 
         localStorage.setItem(STORAGE.username, this.syncForm.username);
         localStorage.setItem(STORAGE.semester, this.syncForm.semester);
@@ -1810,7 +1793,8 @@ createApp({
         const newGrades = rawGrades.map((grade, index) => this.normalizeSchoolGrade(grade, index));
         this.replaceGradesForSemester(this.gradeForm.semester, newGrades);
         this.saveGradeSnapshot(this.gradeForm.semester, newGrades);
-        await this.saveCloudCache("grades", this.gradeForm.semester, newGrades);
+        // 成绩先呈现给用户，云端备份不再拖慢查询完成的反馈。
+        this.saveCloudCache("grades", this.gradeForm.semester, newGrades);
         localStorage.setItem(STORAGE.username, this.gradeForm.username);
         localStorage.setItem(STORAGE.semester, this.gradeForm.semester);
         this.gradeForm.password = "";
