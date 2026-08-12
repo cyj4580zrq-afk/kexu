@@ -711,11 +711,9 @@ createApp({
     },
     deactivateAuthenticatedApp() {
       if (this.autoUpdateTimer) clearTimeout(this.autoUpdateTimer);
-      if (this.countdownTimer) clearInterval(this.countdownTimer);
       if (this.presenceTimer) clearInterval(this.presenceTimer);
       if (this.visibilityChangeListener) document.removeEventListener("visibilitychange", this.visibilityChangeListener);
       this.autoUpdateTimer = null;
-      this.countdownTimer = null;
       this.presenceTimer = null;
       this.visibilityChangeListener = null;
       this.appFeaturesStarted = false;
@@ -1247,15 +1245,18 @@ createApp({
       }
     },
     handleAccountUnavailable(error) {
-      if (!this.accountToken && !this.accountUser) return;
       const message = error.status === 403
         ? "账号已被后台停用，已退出授权状态"
         : "账号登录状态已失效，请重新验证后继续使用";
+      // 正在登录时没有历史令牌：保留表单，让用户能直接看到服务端拒绝原因。
+      const keepLoginSheet = this.authRequiredVisible && !this.accountToken && !this.accountUser;
       this.clearAccountSession();
       this.schoolAuthorized = false;
       this.showSchoolReauth = false;
-      this.authRequiredVisible = false;
-      this.activeTab = "schedule";
+      if (!keepLoginSheet) {
+        this.authRequiredVisible = false;
+        this.activeTab = "schedule";
+      }
       this.notify(message, "error");
     },
     async restoreAccountSession() {
@@ -1329,15 +1330,10 @@ createApp({
       this.syncStep = "正在验证教务身份";
       try {
         await this.authenticateSchool(form, step => { this.syncStep = step; });
-        this.schoolAuthorized = true;
         localStorage.setItem(STORAGE.username, form.username);
         this.syncForm.username = form.username;
         this.gradeForm.username = form.username;
         form.password = "";
-        const target = this.authRequiredTarget || "allCourses";
-        this.closeAuthRequired();
-        this.activeTab = target;
-        this.notify("教务登录成功");
 
         let profile = {};
         try {
@@ -1374,9 +1370,20 @@ createApp({
           this.activateAuthenticatedApp();
           await this.loadCloudCaches();
         } catch (cloudError) {
+          // 停用或令牌失效是服务端的明确拒绝，不能降级为本机授权。
+          if (cloudError.status === 401 || cloudError.status === 403) {
+            this.handleAccountUnavailable(cloudError);
+            return;
+          }
           console.warn("云端身份暂不可用", cloudError);
           this.notify("已进入本机功能，后台同步将在服务恢复后重试", "warning");
         }
+
+        this.schoolAuthorized = true;
+        const target = this.authRequiredTarget || "allCourses";
+        this.closeAuthRequired();
+        this.activeTab = target;
+        this.notify("教务登录成功");
       } catch (error) {
         this.notify(error.message || "教务登录失败，请稍后重试", "error");
       } finally {

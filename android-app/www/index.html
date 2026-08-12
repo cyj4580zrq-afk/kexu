@@ -731,10 +731,9 @@
         <span class="sheet-handle"></span>
         <button class="sheet-close" type="button" aria-label="关闭登录" @click="closeAuthRequired"><app-icon name="X" :size="20"></app-icon></button>
         <div class="auth-required-heading">
-          <span class="auth-required-badge"><app-icon name="GraduationCap" :size="19"></app-icon></span>
-          <div><p class="brand-line">WHCIBE · 教务授权</p><h2 id="auth-required-title">登录以继续</h2></div>
+          <div><p class="brand-line">WHCIBE 教务授权</p><h2 id="auth-required-title">登录以继续</h2></div>
         </div>
-        <p class="sheet-subtitle">验证后即可使用{{ authRequiredFeatureName }}。</p>
+        <p class="sheet-subtitle">验证后即可使用{{ authRequiredFeatureName }}，本次会话内无需重复输入。</p>
         <form class="form-stack account-form" @submit.prevent="loginWithSchoolAccount">
           <label class="field-label" for="feature-student-id">学号</label>
           <div class="input-shell"><app-icon name="UserRound" :size="19"></app-icon><input id="feature-student-id" v-model.trim="schoolOnboardingForm.username" maxlength="40" autocomplete="username" placeholder="输入教务系统学号"></div>
