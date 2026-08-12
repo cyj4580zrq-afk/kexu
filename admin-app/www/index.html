@@ -6,95 +6,51 @@
   <meta name="theme-color" content="#f4f7fc">
   <title>课序管理端</title>
   <style>
-    :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #172033; background: #f4f7fc; }
-    * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; background: radial-gradient(circle at top right, #dfeeff 0, transparent 34%), #f4f7fc; }
-    button, input { font: inherit; }
-    button { border: 0; cursor: pointer; }
-    .shell { width: min(100%, 620px); min-height: 100vh; margin: 0 auto; padding: max(24px, env(safe-area-inset-top)) 20px calc(28px + env(safe-area-inset-bottom)); }
-    .eyebrow { color: #2878ef; font-size: 12px; font-weight: 800; letter-spacing: 1px; }
-    h1 { margin: 7px 0 6px; font-size: 32px; letter-spacing: 0; }
-    .subtle { color: #738095; line-height: 1.6; }
-    .panel { margin-top: 28px; padding: 22px; border: 1px solid #e6ebf2; border-radius: 20px; background: rgba(255,255,255,.9); box-shadow: 0 16px 38px rgba(34,68,115,.10); }
-    .field { display: grid; gap: 8px; margin-top: 16px; color: #4d5c73; font-size: 13px; font-weight: 700; }
-    input { width: 100%; min-height: 50px; padding: 12px 14px; border: 1px solid #d8e0eb; border-radius: 12px; background: #fff; color: #172033; outline: none; }
-    input:focus { border-color: #3384f4; box-shadow: 0 0 0 3px #3384f422; }
-    .primary { width: 100%; min-height: 52px; margin-top: 24px; border-radius: 14px; background: #2878ef; color: white; font-weight: 800; box-shadow: 0 8px 18px #2878ef44; }
-    .primary:disabled { opacity: .55; cursor: wait; }
-    .notice { margin-top: 15px; color: #9a6412; font-size: 12px; line-height: 1.6; }
-    .error { min-height: 22px; margin-top: 12px; color: #c63c45; font-size: 13px; }
-    .hidden { display: none !important; }
-    .topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-    .topbar-actions { display: flex; gap: 8px; }
-    .icon-button { min-width: 42px; height: 42px; padding: 0 12px; border: 1px solid #dfe6ef; border-radius: 13px; background: #fff; color: #34425a; font-weight: 700; }
-    .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 24px 0; }
-    .stat { padding: 17px; border: 1px solid #e4eaf2; border-radius: 16px; background: #fff; }
-    .stat span { color: #7a879a; font-size: 12px; }
-    .stat strong { display: block; margin-top: 7px; font-size: 28px; }
-    .section-title { display: flex; align-items: center; justify-content: space-between; margin: 26px 0 12px; }
-    .section-title h2 { margin: 0; font-size: 19px; }
-    .refresh { color: #2878ef; background: transparent; font-weight: 800; }
-    .users { display: grid; gap: 11px; }
-    .user { padding: 16px; border: 1px solid #e5ebf3; border-radius: 16px; background: #fff; box-shadow: 0 7px 18px rgba(41,74,119,.05); }
-    .user-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-    .name { font-size: 17px; font-weight: 800; }
-    .account { margin-top: 5px; color: #68768b; font-size: 13px; }
-    .meta { margin-top: 12px; color: #8490a2; font-size: 12px; line-height: 1.65; }
-    .status { display: inline-flex; align-items: center; padding: 5px 9px; border-radius: 99px; font-size: 12px; font-weight: 800; }
-    .active { background: #e8f8ef; color: #19764d; }
-    .disabled { background: #fff2df; color: #a15f08; }
-    .deleted { background: #eef1f5; color: #728094; }
-    .action { margin-top: 14px; padding: 8px 11px; border: 1px solid #d9e2ed; border-radius: 9px; background: #fff; color: #34425a; font-size: 13px; font-weight: 800; }
-    .empty { padding: 32px 18px; border: 1px dashed #cfd9e7; border-radius: 16px; color: #7b8799; text-align: center; }
-    .modal-backdrop { position: fixed; inset: 0; display: grid; place-items: end center; padding: 18px; background: #10182766; }
-    .modal { width: min(100%, 520px); padding: 22px; border-radius: 20px; background: #fff; box-shadow: 0 18px 56px #0d1b2d44; }
-    .modal h2 { margin: 0 0 6px; }
-    .modal .primary { margin-top: 18px; }
-    @media (min-width: 520px) { .stats { grid-template-columns: repeat(5, 1fr); } }
+    :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #182136; background: #f4f7fc; }
+    * { box-sizing: border-box; } body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 100% 0, #d9eaff 0, transparent 34%), #f4f7fc; }
+    button, input { font: inherit; } button { border: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    .shell { width: min(100%, 720px); min-height: 100vh; margin: auto; padding: max(26px, env(safe-area-inset-top)) 20px calc(30px + env(safe-area-inset-bottom)); }
+    .eyebrow { color: #2878ef; font-size: 12px; font-weight: 850; letter-spacing: 1.2px; } h1 { margin: 7px 0 8px; font-size: 32px; letter-spacing: 0; } h2 { margin: 0; }
+    .subtle { color: #718097; line-height: 1.65; } .hidden { display: none !important; } .error { min-height: 20px; margin-top: 12px; color: #c6454c; font-size: 13px; }
+    .login-mark { display: grid; width: 56px; height: 56px; margin: 28px 0 20px; place-items: center; border-radius: 18px; background: #17233a; color: #fff; font-size: 20px; font-weight: 850; box-shadow: 0 12px 28px #1939662b; }
+    .panel { margin-top: 24px; padding: 20px; border: 1px solid #e5ebf3; border-radius: 18px; background: rgba(255,255,255,.92); box-shadow: 0 16px 40px rgba(31,68,120,.09); }
+    .field { display: grid; gap: 7px; margin-top: 15px; color: #4e5e75; font-size: 13px; font-weight: 750; } input { width: 100%; min-height: 50px; padding: 12px 14px; border: 1px solid #d8e1ee; border-radius: 12px; outline: 0; background: #f9fbff; color: #182136; } input:focus { border-color: #2878ef; background: #fff; box-shadow: 0 0 0 3px #2878ef1a; }
+    .primary { width: 100%; min-height: 52px; margin-top: 22px; border-radius: 13px; background: #2878ef; color: #fff; font-weight: 800; box-shadow: 0 9px 20px #2878ef3b; } .primary:disabled { opacity: .55; cursor: wait; }
+    .notice { margin: 16px 2px 0; color: #8b6c2d; font-size: 12px; line-height: 1.6; }
+    .topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }.topbar-actions { display: flex; gap: 8px; }.icon-button { min-width: 42px; height: 42px; padding: 0 11px; border: 1px solid #dce5f0; border-radius: 12px; background: #fff; color: #33425a; font-size: 12px; font-weight: 750; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin: 22px 0; }.stat { padding: 14px; border: 1px solid #e4eaf3; border-radius: 14px; background: #fff; }.stat span { color: #758399; font-size: 11px; }.stat strong { display: block; margin-top: 5px; font-size: 24px; }
+    .section-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 26px 0 12px; }.section-title h2 { font-size: 19px; }.refresh { color: #2878ef; background: transparent; font-weight: 800; }
+    .filters { display: flex; gap: 8px; margin: 0 -20px 14px; padding: 0 20px 4px; overflow-x: auto; scrollbar-width: none; }.filters::-webkit-scrollbar { display: none; }.filter { height: 34px; padding: 0 13px; flex: 0 0 auto; border: 1px solid #dce5ef; border-radius: 17px; background: #fff; color: #64738a; font-size: 12px; font-weight: 750; }.filter.active { border-color: #2878ef; background: #2878ef; color: #fff; }
+    .users { display: grid; gap: 10px; }.user { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 12px; width: 100%; padding: 16px; text-align: left; border: 1px solid #e3eaf3; border-radius: 15px; background: #fff; box-shadow: 0 7px 18px rgba(41,74,119,.045); }.user:active { transform: scale(.99); }.user-main { min-width: 0; }.user-head { display: flex; align-items: center; justify-content: space-between; gap: 9px; }.name { overflow: hidden; font-size: 16px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }.account, .user-summary { margin-top: 5px; overflow: hidden; color: #748197; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }.user-arrow { color: #9aa8ba; font-size: 24px; }.status { display: inline-flex; flex: 0 0 auto; align-items: center; padding: 4px 8px; border-radius: 99px; font-size: 11px; font-weight: 800; }.active { background: #e8f8ef; color: #19764d; }.disabled { background: #fff2df; color: #a15f08; }.deleted { background: #eef1f5; color: #728094; }.empty { padding: 32px 18px; border: 1px dashed #cfd9e7; border-radius: 16px; color: #7b8799; text-align: center; }
+    .modal-backdrop { position: fixed; z-index: 10; inset: 0; display: flex; align-items: flex-end; justify-content: center; padding: 12px; background: rgba(14,23,37,.42); -webkit-backdrop-filter: blur(5px); backdrop-filter: blur(5px); }.modal { width: min(100%, 620px); max-height: calc(92svh - env(safe-area-inset-top)); padding: 16px 18px calc(20px + env(safe-area-inset-bottom)); overflow: auto; border-radius: 20px; background: #fff; box-shadow: 0 18px 56px #0d1b2d44; }.handle { width: 36px; height: 4px; margin: 0 auto 14px; border-radius: 9px; background: #d9e1eb; }.modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }.modal-header h2 { font-size: 22px; }.modal-header p { margin: 5px 0 0; color: #758399; font-size: 12px; }.close { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 50%; background: #f1f5fa; color: #33425a; font-size: 22px; }.detail-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; margin: 20px 0; }.detail-item { min-height: 72px; padding: 12px; border: 1px solid #e5ebf2; border-radius: 12px; background: #fbfcff; }.detail-item.wide { grid-column: 1 / -1; }.detail-item span { display: block; color: #7a8799; font-size: 11px; }.detail-item strong { display: block; margin-top: 6px; overflow-wrap: anywhere; color: #253149; font-size: 14px; }.status-action { width: 100%; min-height: 48px; margin: 2px 0 8px; border: 1px solid #dbe4ef; border-radius: 12px; background: #fff; color: #33425a; font-weight: 800; }.status-action.danger { border-color: #ffd6d8; background: #fff5f5; color: #c74b50; }
+    @media (min-width: 560px) { .stats { grid-template-columns: repeat(5, 1fr); }.shell { padding-inline: 28px; }.filters { margin-inline: 0; padding-inline: 0; } }
   </style>
 </head>
 <body>
   <main class="shell">
     <section id="loginView">
+      <div class="login-mark">课</div>
       <div class="eyebrow">KEXU ADMIN</div>
-      <h1>课序管理端</h1>
-      <p class="subtle">查看经用户同意同步的账户资料，并管理账户状态。</p>
+      <h1>账号管理</h1>
+      <p class="subtle">管理已同意同步资料的学生账号、状态与近期活跃情况。</p>
       <form id="loginForm" class="panel">
         <label class="field">服务地址<input id="serverUrl" type="url" autocomplete="url" inputmode="url"></label>
         <label class="field">管理员账号<input id="username" value="kexu-admin" autocomplete="username"></label>
         <label class="field">管理员密码<input id="password" type="password" autocomplete="current-password"></label>
         <button id="loginButton" class="primary" type="submit">进入管理后台</button>
         <div id="loginError" class="error"></div>
-        <p class="notice">管理员密码仅保留在本次打开期间。当前服务器为 HTTP 测试地址时，请勿在公共网络使用。</p>
+        <p class="notice">管理员密码只保留在本次使用期间。当前为 HTTP 地址时，请勿在公共网络使用。</p>
       </form>
     </section>
     <section id="dashboardView" class="hidden">
-      <div class="topbar">
-        <div><div class="eyebrow">ACCOUNT CENTER</div><h1>账号管理</h1><p id="serverLabel" class="subtle"></p></div>
-        <div class="topbar-actions"><button id="changePasswordButton" class="icon-button" type="button">改密码</button><button id="logoutButton" class="icon-button" type="button">退出</button></div>
-      </div>
-      <div class="stats">
-        <div class="stat"><span>注册总数</span><strong id="totalCount">-</strong></div>
-        <div class="stat"><span>正常</span><strong id="activeCount">-</strong></div>
-        <div class="stat"><span>停用</span><strong id="disabledCount">-</strong></div>
-        <div class="stat"><span>已注销</span><strong id="deletedCount">-</strong></div>
-        <div class="stat"><span>在线</span><strong id="onlineCount">-</strong></div>
-      </div>
-      <div class="section-title"><h2>注册用户</h2><button id="refreshButton" class="refresh" type="button">刷新</button></div>
-      <div id="dashboardError" class="error"></div>
-      <div id="users" class="users"></div>
+      <div class="topbar"><div><div class="eyebrow">ACCOUNT CENTER</div><h1>学生管理</h1><p id="serverLabel" class="subtle"></p></div><div class="topbar-actions"><button id="changePasswordButton" class="icon-button" type="button">改密码</button><button id="logoutButton" class="icon-button" type="button">退出</button></div></div>
+      <div class="stats"><div class="stat"><span>注册</span><strong id="totalCount">-</strong></div><div class="stat"><span>正常</span><strong id="activeCount">-</strong></div><div class="stat"><span>在线</span><strong id="onlineCount">-</strong></div><div class="stat"><span>停用</span><strong id="disabledCount">-</strong></div><div class="stat"><span>注销</span><strong id="deletedCount">-</strong></div></div>
+      <div class="section-title"><h2>学生账号</h2><button id="refreshButton" class="refresh" type="button">刷新</button></div>
+      <div id="filters" class="filters" aria-label="账号筛选"><button class="filter active" data-filter="all" type="button">全部</button><button class="filter" data-filter="active" type="button">正常</button><button class="filter" data-filter="online" type="button">在线</button><button class="filter" data-filter="disabled" type="button">停用</button><button class="filter" data-filter="deleted" type="button">已注销</button></div>
+      <div id="dashboardError" class="error"></div><div id="users" class="users"></div>
     </section>
-    <section id="passwordModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="passwordTitle">
-      <form id="passwordForm" class="modal">
-        <h2 id="passwordTitle">修改管理密码</h2>
-        <p class="subtle">新密码至少 10 位，需包含字母和数字。</p>
-        <label class="field">新密码<input id="newPassword" type="password" minlength="10" autocomplete="new-password" required></label>
-        <label class="field">确认新密码<input id="confirmPassword" type="password" minlength="10" autocomplete="new-password" required></label>
-        <div id="passwordError" class="error"></div>
-        <button id="savePasswordButton" class="primary" type="submit">保存新密码</button>
-        <button id="cancelPasswordButton" class="refresh" type="button" style="margin-top:16px">取消</button>
-      </form>
-    </section>
+    <section id="userDetailModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="userDetailTitle"><div class="modal"><div class="handle"></div><div class="modal-header"><div><h2 id="userDetailTitle">学生资料</h2><p id="userDetailSubtitle"></p></div><button id="closeUserDetail" class="close" type="button" aria-label="关闭">×</button></div><div id="userDetailContent" class="detail-grid"></div><button id="userStatusAction" class="status-action" type="button"></button></div></section>
+    <section id="passwordModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="passwordTitle"><form id="passwordForm" class="modal"><div class="handle"></div><div class="modal-header"><div><h2 id="passwordTitle">修改管理密码</h2><p>新密码至少 10 位，需包含字母和数字。</p></div><button id="cancelPasswordButton" class="close" type="button" aria-label="关闭">×</button></div><label class="field">新密码<input id="newPassword" type="password" minlength="10" autocomplete="new-password" required></label><label class="field">确认新密码<input id="confirmPassword" type="password" minlength="10" autocomplete="new-password" required></label><div id="passwordError" class="error"></div><button id="savePasswordButton" class="primary" type="submit">保存新密码</button></form></section>
   </main>
   <script src="app.js"></script>
 </body>

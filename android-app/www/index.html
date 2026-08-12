@@ -437,7 +437,7 @@
           </button>
         </div>
 
-        <p class="version-text">课序 2.1.6 Beta</p>
+        <p class="version-text">课序 2.1.7 Beta</p>
       </section>
 
       <section v-show="activeTab === 'account'" class="page standard-page account-page">
@@ -716,7 +716,7 @@
           </button>
         </div>
 
-        <p class="version-text">课序 2.1.6 Beta</p>
+        <p class="version-text">课序 2.1.7 Beta</p>
       </section>
     </main>
 
@@ -741,18 +741,20 @@
       <section class="sheet auth-required-sheet" role="dialog" aria-modal="true" aria-labelledby="auth-required-title">
         <span class="sheet-handle"></span>
         <button class="sheet-close" type="button" aria-label="关闭登录" @click="closeAuthRequired"><app-icon name="X" :size="20"></app-icon></button>
-        <p class="brand-line">WHCIBE</p>
-        <h2 id="auth-required-title">登录后继续使用</h2>
-        <p class="sheet-subtitle">使用教务系统学号验证后，即可进入{{ authRequiredFeatureName }}。</p>
+        <div class="auth-required-heading">
+          <span class="auth-required-badge"><app-icon name="GraduationCap" :size="19"></app-icon></span>
+          <div><p class="brand-line">WHCIBE · 教务授权</p><h2 id="auth-required-title">登录以继续</h2></div>
+        </div>
+        <p class="sheet-subtitle">验证后可使用{{ authRequiredFeatureName }}，本次会话内无需重复输入密码。</p>
         <form class="form-stack account-form" @submit.prevent="loginWithSchoolAccount">
-          <label class="field-label" for="feature-student-id">教务系统学号</label>
-          <div class="input-shell"><app-icon name="UserRound" :size="19"></app-icon><input id="feature-student-id" v-model.trim="schoolOnboardingForm.username" maxlength="40" autocomplete="username" placeholder="请输入学号"></div>
-          <label class="field-label" for="feature-school-password">教务系统密码</label>
-          <div class="input-shell"><app-icon name="LockKeyhole" :size="19"></app-icon><input id="feature-school-password" v-model="schoolOnboardingForm.password" type="password" maxlength="128" autocomplete="current-password" placeholder="仅用于本机教务验证"></div>
-          <label class="account-consent"><input v-model="accountPrivacyConsent" type="checkbox"><span>我同意将学号及本人主动同步的课表、成绩和同步时间用于账号管理与云端缓存。</span></label>
+          <label class="field-label" for="feature-student-id">学号</label>
+          <div class="input-shell"><app-icon name="UserRound" :size="19"></app-icon><input id="feature-student-id" v-model.trim="schoolOnboardingForm.username" maxlength="40" autocomplete="username" placeholder="输入教务系统学号"></div>
+          <label class="field-label" for="feature-school-password">教务密码</label>
+          <div class="input-shell"><app-icon name="LockKeyhole" :size="19"></app-icon><input id="feature-school-password" v-model="schoolOnboardingForm.password" type="password" maxlength="128" autocomplete="current-password" placeholder="仅用于本机身份验证"></div>
+          <label class="account-consent"><input v-model="accountPrivacyConsent" type="checkbox"><span>我已阅读并同意将学号与本人主动同步的数据用于账号管理及云端缓存。</span></label>
           <button class="primary-button" type="submit" :disabled="accountLoading"><app-icon :name="accountLoading ? 'LoaderCircle' : 'LogIn'" :size="18" :class="{ spinning: accountLoading }"></app-icon>{{ accountLoading ? syncStep : '登录并继续' }}</button>
         </form>
-        <div class="account-separation auth-gate-note"><app-icon name="ShieldCheck" :size="18"></app-icon><p><strong>教务密码不会上传或保存到课序服务器</strong><br>后台同步失败不会影响本机继续使用。</p></div>
+        <div class="account-separation auth-gate-note"><app-icon name="ShieldCheck" :size="18"></app-icon><p><strong>密码只用于本机验证，不会上传或保存</strong><br>授权后可随时在“我的”中管理本地数据。</p></div>
       </section>
     </div>
 
