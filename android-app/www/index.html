@@ -407,6 +407,15 @@
           </button>
         </div>
 
+        <div v-if="accountUser || schoolAuthorized" class="settings-group account-session-group">
+          <h2>账号与授权</h2>
+          <button type="button" class="setting-row sign-out-row" @click="signOutCurrentAccount">
+            <span class="setting-icon red"><app-icon name="LogOut" :size="19"></app-icon></span>
+            <span><strong>退出当前账号</strong><small>退出后需重新验证教务身份</small></span>
+            <app-icon name="ChevronRight" :size="18"></app-icon>
+          </button>
+        </div>
+
         <div class="settings-group settings-hub">
           <h2>设置中心</h2>
           <button type="button" class="setting-row" @click="openTab('courseSettings')">
@@ -431,7 +440,7 @@
           </button>
         </div>
 
-        <p class="version-text">课序 2.2.3 Beta</p>
+        <p class="version-text">课序 2.2.5 Beta</p>
       </section>
 
       <section v-show="activeTab === 'account'" class="page standard-page account-page">
@@ -449,9 +458,9 @@
           <div class="account-note"><app-icon name="ShieldCheck" :size="18"></app-icon><p>教务密码不会上传或保存。你同意同步的课表与成绩会保存至云端，供本设备和后续设备读取。</p></div>
           <div class="settings-group account-actions">
             <h2>账号操作</h2>
-            <button type="button" class="setting-row" @click="logoutKexuAccount">
+            <button type="button" class="setting-row" @click="signOutCurrentAccount">
               <span class="setting-icon gray"><app-icon name="LogOut" :size="19"></app-icon></span>
-              <span><strong>退出本机</strong><small>不会删除本机课程和成绩</small></span>
+              <span><strong>退出当前账号</strong><small>不会删除本机课程和成绩</small></span>
               <app-icon name="ChevronRight" :size="18"></app-icon>
             </button>
           </div>

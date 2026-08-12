@@ -1482,10 +1482,23 @@ createApp({
     },
     logoutKexuAccount() {
       this.clearAccountSession();
+      this.schoolAuthorized = false;
+      this.showSchoolReauth = false;
+      localStorage.removeItem(STORAGE.username);
+      this.schoolOnboardingForm.username = "";
+      this.schoolOnboardingForm.password = "";
+      this.syncForm.username = "";
+      this.syncForm.password = "";
+      this.gradeForm.username = "";
+      this.gradeForm.password = "";
       this.accountSessionReady = true;
       this.activeTab = "schedule";
       this.accountDeletePassword = "";
       this.notify("已退出课序账号", "info");
+    },
+    signOutCurrentAccount() {
+      if (!window.confirm("确定退出当前账号吗？已导入的课表、成绩和倒计时仍会保留在本机。")) return;
+      this.logoutKexuAccount();
     },
     async deleteKexuAccount() {
       if (!this.accountDeletePassword) return this.notify("请输入课序账号密码", "warning");
