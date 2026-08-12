@@ -11,7 +11,7 @@ const SCHOOL_GRADE_REFERER_PATH = "/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005";
 const SCHOOL_GRADE_DETAIL_PATH = "/cjcx/cjcx_cxCjxqGjh.html";
 // Temporary Aliyun endpoint while the production HTTPS domain is being configured.
 const ACCOUNT_API_BASE = localStorage.getItem("kexu-account-api-base") || "http://47.122.105.185";
-const APP_VERSION = "2.1.9-beta";
+const APP_VERSION = "2.2.0-beta";
 const STORAGE = {
   courses: "campusflow-courses",
   history: "campusflow-sync-history",
@@ -1315,17 +1315,19 @@ createApp({
           this.accountToken = payload.token;
           this.accountUser = normalizeAccountUser(payload.user);
           localStorage.setItem(STORAGE.accountToken, payload.token);
-          await this.accountApiRequest("/api/cloud/profile", {
-            method: "POST",
-            body: {
-              college: profile.college,
-              department: profile.department,
-              major: profile.major,
-              class_name: profile.className,
-              entry_grade: profile.grade,
-              enrollment_status: profile.enrollmentStatus
-            }
-          });
+          if (profile.realName || profile.college || profile.major || profile.className) {
+            await this.accountApiRequest("/api/cloud/profile", {
+              method: "POST",
+              body: {
+                college: profile.college,
+                department: profile.department,
+                major: profile.major,
+                class_name: profile.className,
+                entry_grade: profile.grade,
+                enrollment_status: profile.enrollmentStatus
+              }
+            });
+          }
           this.activateAuthenticatedApp();
           await this.loadCloudCaches();
         } catch (cloudError) {
@@ -1547,6 +1549,26 @@ createApp({
       }
       return profile;
     },
+    async syncStudentProfileForCurrentSession() {
+      if (!this.accountToken) return false;
+      const profile = await this.fetchSchoolProfile();
+      if (!profile.realName && !profile.college && !profile.major && !profile.className) {
+        throw new Error("教务系统未返回可用的学籍资料");
+      }
+      const payload = await this.accountApiRequest("/api/cloud/profile", {
+        method: "POST",
+        body: {
+          college: profile.college,
+          department: profile.department,
+          major: profile.major,
+          class_name: profile.className,
+          entry_grade: profile.grade,
+          enrollment_status: profile.enrollmentStatus
+        }
+      });
+      if (profile.realName && this.accountUser) this.accountUser.realName = profile.realName;
+      return payload;
+    },
     async selectSchoolRoute(options = {}) {
       const routes = [
         { base: SCHOOL_INTRANET_BASE, label: "preferred" },
@@ -1654,6 +1676,11 @@ createApp({
       this.schoolStatus = { type: "unknown", text: "连接中" };
       try {
         await this.prepareSchoolSession(this.syncForm, step => { this.syncStep = step; });
+        try {
+          await this.syncStudentProfileForCurrentSession();
+        } catch (profileError) {
+          console.warn("学籍资料同步稍后重试", profileError);
+        }
         const endpoints = this.schoolEndpoints();
 
         this.syncStep = "正在获取课程";

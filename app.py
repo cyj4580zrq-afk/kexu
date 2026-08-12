@@ -810,7 +810,9 @@ def update_cloud_presence(user: Any = Depends(current_account)) -> dict:
 def update_student_profile(req: StudentProfileRequest, user: Any = Depends(current_account)) -> dict:
     updated_at = utc_now()
     with database_connection() as connection:
-        execute(connection, """UPDATE app_users SET college = ?, department = ?, major = ?, class_name = ?, entry_grade = ?, enrollment_status = ?,
+        execute(connection, """UPDATE app_users SET college = COALESCE(NULLIF(?, ''), college), department = COALESCE(NULLIF(?, ''), department),
+                   major = COALESCE(NULLIF(?, ''), major), class_name = COALESCE(NULLIF(?, ''), class_name),
+                   entry_grade = COALESCE(NULLIF(?, ''), entry_grade), enrollment_status = COALESCE(NULLIF(?, ''), enrollment_status),
                    profile_updated_at = ? WHERE id = ?""", (
             req.college.strip(), req.department.strip(), req.major.strip(), req.class_name.strip(), req.entry_grade.strip(), req.enrollment_status.strip(), updated_at, user["id"]
         ))
