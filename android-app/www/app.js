@@ -11,7 +11,7 @@ const SCHOOL_GRADE_REFERER_PATH = "/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005";
 const SCHOOL_GRADE_DETAIL_PATH = "/cjcx/cjcx_cxCjxqGjh.html";
 // Temporary Aliyun endpoint while the production HTTPS domain is being configured.
 const ACCOUNT_API_BASE = localStorage.getItem("kexu-account-api-base") || "http://47.122.105.185";
-const APP_VERSION = "2.1.7-beta";
+const APP_VERSION = "2.1.8-beta";
 const STORAGE = {
   courses: "campusflow-courses",
   history: "campusflow-sync-history",
@@ -1579,8 +1579,28 @@ createApp({
       }
     },
     async authenticateSchool(credentials, setStep) {
-      setStep("正在选择教务线路");
-      await this.selectSchoolRoute();
+      const routes = [
+        { base: SCHOOL_INTRANET_BASE, label: "preferred", step: "正在连接校园网络" },
+        { base: SCHOOL_PUBLIC_BASE, label: "fallback", step: "正在切换备用网络" }
+      ];
+      let lastError;
+      for (const route of routes) {
+        this.schoolBase = route.base;
+        this.schoolRoute = route.label;
+        setStep(route.step);
+        try {
+          await this.authenticateSchoolOnCurrentRoute(credentials, setStep);
+          this.schoolStatus = { type: "online", text: "网络已连接" };
+          return;
+        } catch (error) {
+          // Credentials rejected by the school should not be retried against another route.
+          if (error.status === 401) throw error;
+          lastError = error;
+        }
+      }
+      throw lastError || new Error("教务系统当前无法连接，请稍后再试");
+    },
+    async authenticateSchoolOnCurrentRoute(credentials, setStep) {
       const endpoints = this.schoolEndpoints();
       setStep("正在获取登录信息");
       const loginPage = await this.httpRequest("GET", endpoints.login, {
