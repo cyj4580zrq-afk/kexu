@@ -154,11 +154,12 @@ public class MainActivity extends BridgeActivity {
                 JSONObject apk = null;
                 for (int releaseIndex = 0; releaseIndex < releases.length() && apk == null; releaseIndex++) {
                     JSONObject candidateRelease = releases.optJSONObject(releaseIndex);
+                    if (candidateRelease == null || candidateRelease.optBoolean("draft") || candidateRelease.optBoolean("prerelease")) continue;
                     JSONArray assets = candidateRelease == null ? null : candidateRelease.optJSONArray("assets");
                     if (assets == null) continue;
                     for (int assetIndex = 0; assetIndex < assets.length(); assetIndex++) {
                         JSONObject candidate = assets.optJSONObject(assetIndex);
-                        if (candidate != null && candidate.optString("name").endsWith(".apk")) {
+                        if (candidate != null && candidate.optString("name").matches("(?i)^Kexu-Android-v.+-stable\\.apk$")) {
                             release = candidateRelease;
                             apk = candidate;
                             break;

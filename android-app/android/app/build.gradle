@@ -13,8 +13,8 @@ android {
         applicationId "com.campusflow.schedule"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 228
-        versionName "2.2.8-stable"
+        versionCode 230
+        versionName "2.3.0-stable"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

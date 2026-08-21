@@ -11,7 +11,7 @@ const SCHOOL_GRADE_REFERER_PATH = "/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005";
 const SCHOOL_GRADE_DETAIL_PATH = "/cjcx/cjcx_cxCjxqGjh.html";
 // Temporary Aliyun endpoint while the production HTTPS domain is being configured.
 const ACCOUNT_API_BASE = localStorage.getItem("kexu-account-api-base") || "http://47.122.105.185";
-const APP_VERSION = "2.2.3-beta";
+const APP_VERSION = "2.3.0-stable";
 const STORAGE = {
   courses: "campusflow-courses",
   history: "campusflow-sync-history",
@@ -276,6 +276,7 @@ createApp({
   data() {
     const semester = localStorage.getItem(STORAGE.semester) || defaultSemester();
     return {
+      appVersion: APP_VERSION,
       tabs: [
         { value: "schedule", label: "首页", icon: "House" },
         { value: "allCourses", label: "课表", icon: "CalendarDays" },
@@ -1084,8 +1085,12 @@ createApp({
         });
         if (!response.ok) throw new Error(`更新服务返回 ${response.status}`);
         const releases = await response.json();
-        const release = (releases || []).find(item => (item.assets || []).some(asset => String(asset.name).endsWith(".apk")));
-        const asset = (release?.assets || []).find(item => String(item.name).endsWith(".apk"));
+        const release = (releases || []).find(item =>
+          !item.draft &&
+          !item.prerelease &&
+          (item.assets || []).some(asset => /^Kexu-Android-v.+-stable\.apk$/i.test(String(asset.name)))
+        );
+        const asset = (release?.assets || []).find(item => /^Kexu-Android-v.+-stable\.apk$/i.test(String(item.name)));
         this.handleUpdateEvent(asset ? {
           type: "release",
           version: release.tag_name,
