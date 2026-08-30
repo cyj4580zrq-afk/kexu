@@ -1,12 +1,12 @@
 {
   "name": "kexu-mobile",
-  "version": "2.3.0-stable",
+  "version": "2.5.0-stable",
   "private": true,
   "description": "课序 Android 课程表",
   "scripts": {
-    "sync": "cap sync && node scripts/fix-ios-package-paths.mjs",
-    "sync:android": "cap sync android",
-    "sync:ios": "cap sync ios && node scripts/fix-ios-package-paths.mjs",
+    "sync": "node scripts/patch-capacitor-http.mjs && node scripts/copy-pdfjs.mjs && cap sync && node scripts/fix-ios-package-paths.mjs",
+    "sync:android": "node scripts/patch-capacitor-http.mjs && node scripts/copy-pdfjs.mjs && cap sync android",
+    "sync:ios": "node scripts/patch-capacitor-http.mjs && node scripts/copy-pdfjs.mjs && cap sync ios && node scripts/fix-ios-package-paths.mjs",
     "build:apk": "cd android && gradlew.bat assembleRelease",
     "open:ios": "cap open ios"
   },
@@ -21,6 +21,8 @@
     "element-plus": "2.11.4",
     "jsencrypt": "^3.3.2",
     "lucide": "^0.468.0",
+    "pdfjs-dist": "5.4.296",
+    "tesseract.js": "5.1.1",
     "vue": "3.5.22"
   },
   "devDependencies": {

@@ -1,6 +1,7 @@
 const { createApp } = Vue;
 
-const SCHOOL_PUBLIC_BASE = "https://jw.whcibe.com";
+const SCHOOL_PUBLIC_BASE = "http://jw.whcibe.com";
+const SCHOOL_HTTPS_BASE = "https://jw.whcibe.com";
 const SCHOOL_INTRANET_BASE = "http://10.1.4.138";
 const SCHOOL_LOGIN_PATH = "/xtgl/login_slogin.html";
 const SCHOOL_PUBKEY_PATH = "/xtgl/login_getPublicKey.html";
@@ -11,7 +12,7 @@ const SCHOOL_GRADE_REFERER_PATH = "/cjcx/cjcx_cxDgXscj.html?gnmkdm=N305005";
 const SCHOOL_GRADE_DETAIL_PATH = "/cjcx/cjcx_cxCjxqGjh.html";
 // Temporary Aliyun endpoint while the production HTTPS domain is being configured.
 const ACCOUNT_API_BASE = localStorage.getItem("kexu-account-api-base") || "http://47.122.105.185";
-const APP_VERSION = "2.3.0-stable";
+const APP_VERSION = "2.5.0-stable";
 const STORAGE = {
   courses: "campusflow-courses",
   history: "campusflow-sync-history",
@@ -90,6 +91,25 @@ const AppIcon = {
     }
   }
 };
+
+function calculateCurrentWeekFromStartDate(startDateStr, fallbackWeek = 1) {
+  if (!startDateStr || !/^\d{4}-\d{2}-\d{2}$/.test(String(startDateStr))) return fallbackWeek;
+  const [y, m, d] = startDateStr.split("-").map(Number);
+  const termDate = new Date(y, m - 1, d);
+  if (Number.isNaN(termDate.getTime())) return fallbackWeek;
+  const termWeekday = termDate.getDay() || 7;
+  const termMonday = new Date(termDate.getFullYear(), termDate.getMonth(), termDate.getDate() - termWeekday + 1);
+  termMonday.setHours(0, 0, 0, 0);
+
+  const today = new Date();
+  const todayWeekday = today.getDay() || 7;
+  const todayMonday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - todayWeekday + 1);
+  todayMonday.setHours(0, 0, 0, 0);
+
+  const diffDays = Math.round((todayMonday.getTime() - termMonday.getTime()) / (1000 * 60 * 60 * 24));
+  const calculatedWeek = Math.floor(diffDays / 7) + 1;
+  return Math.min(30, Math.max(1, calculatedWeek));
+}
 
 function defaultSemester() {
   const now = new Date();
@@ -287,8 +307,16 @@ createApp({
       activeTab: "schedule",
       weekDays: WEEK_DAYS,
       selectedDay: "全部",
-      currentWeek: Number(localStorage.getItem(STORAGE.currentWeek)) || 1,
-      selectedWeek: Number(localStorage.getItem(STORAGE.selectedWeek)) || Number(localStorage.getItem(STORAGE.currentWeek)) || 1,
+      currentWeek: (() => {
+        const savedStart = localStorage.getItem(STORAGE.semesterStartDate);
+        if (savedStart) return calculateCurrentWeekFromStartDate(savedStart, Number(localStorage.getItem(STORAGE.currentWeek)) || 1);
+        return Number(localStorage.getItem(STORAGE.currentWeek)) || 1;
+      })(),
+      selectedWeek: (() => {
+        const savedStart = localStorage.getItem(STORAGE.semesterStartDate);
+        const calculated = savedStart ? calculateCurrentWeekFromStartDate(savedStart, Number(localStorage.getItem(STORAGE.currentWeek)) || 1) : null;
+        return Number(localStorage.getItem(STORAGE.selectedWeek)) || calculated || Number(localStorage.getItem(STORAGE.currentWeek)) || 1;
+      })(),
       weekSheetVisible: false,
       weekSheetMode: "view",
       semesterSheetVisible: false,
@@ -524,11 +552,46 @@ createApp({
         courses: this.visibleCourses.filter(course => course.day === day)
       })).filter(group => group.courses.length);
     },
+    semesterStartDateLabel() {
+      if (!this.semesterStartDate) return "";
+      const [y, m, d] = this.semesterStartDate.split("-");
+      return `${y}年${Number(m)}月${Number(d)}日`;
+    },
+    daysUntilSemesterStart() {
+      if (!this.semesterStartDate || !/^\d{4}-\d{2}-\d{2}$/.test(this.semesterStartDate)) return 0;
+      const [y, m, d] = this.semesterStartDate.split("-").map(Number);
+      const start = new Date(y, m - 1, d);
+      start.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const diffDays = Math.round((start.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      return Math.max(0, diffDays);
+    },
+    isPreSemester() {
+      return this.daysUntilSemesterStart > 0;
+    },
+    semesterStatusText() {
+      if (!this.semesterStartDate) return "";
+      if (this.daysUntilSemesterStart > 0) {
+        return `尚未开课 · 距离第 1 周开学还有 ${this.daysUntilSemesterStart} 天`;
+      }
+      return `第 ${this.currentWeek} 教学周`;
+    },
     weekCalendarDays() {
       const today = new Date();
-      const weekday = today.getDay() || 7;
-      const monday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - weekday + 1);
-      monday.setDate(monday.getDate() + (this.selectedWeek - this.currentWeek) * 7);
+      let monday;
+      if (this.semesterStartDate && /^\d{4}-\d{2}-\d{2}$/.test(this.semesterStartDate)) {
+        const [y, m, d] = this.semesterStartDate.split("-").map(Number);
+        const termDate = new Date(y, m - 1, d);
+        const termWeekday = termDate.getDay() || 7;
+        const termMonday = new Date(termDate.getFullYear(), termDate.getMonth(), termDate.getDate() - termWeekday + 1);
+        termMonday.setDate(termMonday.getDate() + (this.selectedWeek - 1) * 7);
+        monday = termMonday;
+      } else {
+        const weekday = today.getDay() || 7;
+        monday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - weekday + 1);
+        monday.setDate(monday.getDate() + (this.selectedWeek - this.currentWeek) * 7);
+      }
       return WEEK_DAYS.map((name, index) => {
         const date = new Date(monday);
         date.setDate(monday.getDate() + index);
@@ -1208,6 +1271,27 @@ createApp({
     async accountApiRequest(path, options = {}) {
       const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
       if (this.accountToken) headers.Authorization = `Bearer ${this.accountToken}`;
+      // Android 上不使用被 CapacitorHttp 接管的全局 fetch。它会通过 WebView
+      // 的拦截器保留连接；学校服务关闭连接后，下一次登录会直接抛出 EOF。
+      // 账号服务也统一走可控的原生请求通道，确保每次请求都会释放连接并重试。
+      if (window.capacitorExports?.CapacitorHttp) {
+        try {
+          const response = await this.httpRequest(options.method || "GET", `${ACCOUNT_API_BASE}${path}`, {
+            headers,
+            data: options.body,
+            responseType: "json",
+            connectTimeout: options.connectTimeout || 7000,
+            readTimeout: options.timeout || 7000
+          });
+          return responseData(response) || {};
+        } catch (error) {
+          const networkError = new Error(/timed? out/i.test(String(error?.message || error))
+            ? "账号服务响应较慢，请稍后重试"
+            : "暂时无法连接课序账号服务，请稍后重试");
+          networkError.network = true;
+          throw networkError;
+        }
+      }
       let response;
       const controller = typeof AbortController === "undefined" ? null : new AbortController();
       const timeout = controller ? setTimeout(() => controller.abort(), options.timeout || 7000) : null;
@@ -1469,6 +1553,9 @@ createApp({
     },
     logoutKexuAccount() {
       this.clearAccountSession();
+      // 教务系统的 JSESSIONID / route Cookie 属于原生 CookieManager，不在
+      // localStorage 中。若保留它们，下一次登录会命中已失效的后端会话。
+      this.clearSchoolSessionCookies();
       this.schoolAuthorized = false;
       this.showSchoolReauth = false;
       localStorage.removeItem(STORAGE.username);
@@ -1537,18 +1624,27 @@ createApp({
         connectTimeout: options.connectTimeout || 10000,
         readTimeout: options.readTimeout || 22000,
         responseType: options.responseType || "text",
-        headers: options.headers || {},
+        // 教务系统会主动关闭空闲 HTTP 连接。Android 的网络组件偶尔会在
+        // 退出后再次登录时复用该连接，导致 "unexpected end of stream"。
+        // 每次请求关闭连接，并在这类瞬断发生时自动重试一次。
+        headers: { Connection: "close", ...(options.headers || {}) },
         params: options.params,
         data: options.data
       };
       let response;
-      try {
-        response = await http.request(request);
-      } catch (error) {
-        if (/CertPathValidatorException|Trust anchor|certificate/i.test(String(error?.message || error))) {
-          throw new Error("教务系统安全证书暂不可验证。请连接校园网后重试，或稍后等待学校恢复证书服务。");
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          response = await http.request(request);
+          break;
+        } catch (error) {
+          const message = String(error?.message || error);
+          if (/CertPathValidatorException|Trust anchor|certificate/i.test(message)) {
+            throw new Error("教务系统安全证书暂不可验证。请连接校园网后重试，或稍后等待学校恢复证书服务。");
+          }
+          const staleConnection = /unexpected end of stream|stream was reset|connection reset|socket closed|broken pipe|eof/i.test(message);
+          if (attempt === 0 && staleConnection) continue;
+          throw error;
         }
-        throw error;
       }
       if (response.status < 200 || response.status >= 400) {
         const error = new Error(`教务系统返回异常（${response.status}）`);
@@ -1630,18 +1726,22 @@ createApp({
       this.schoolStatus = { type: "offline", text: "需重新验证" };
       return "教务会话已失效，请输入教务密码重新验证后重试";
     },
-    async selectSchoolRoute(options = {}) {
-      const routes = [
-        { base: SCHOOL_INTRANET_BASE, label: "preferred" },
-        { base: SCHOOL_PUBLIC_BASE, label: "fallback" }
+    schoolRoutesByPreference() {
+      return [
+        { base: SCHOOL_PUBLIC_BASE, label: "public", step: "正在连接公网教务" },
+        { base: SCHOOL_HTTPS_BASE, label: "public-https", step: "正在尝试加密通道" },
+        { base: SCHOOL_INTRANET_BASE, label: "intranet", step: "正在尝试校园内网" }
       ];
+    },
+    async selectSchoolRoute(options = {}) {
+      const routes = this.schoolRoutesByPreference();
       let lastError;
       for (const route of routes) {
         try {
           await this.httpRequest("GET", `${route.base}${SCHOOL_LOGIN_PATH}`, {
             responseType: "text",
-            connectTimeout: 6500,
-            readTimeout: 9000
+            connectTimeout: 4500,
+            readTimeout: 7000
           });
           if (options.commit !== false) {
             this.schoolBase = route.base;
@@ -1665,10 +1765,10 @@ createApp({
       }
     },
     async authenticateSchool(credentials, setStep) {
-      const routes = [
-        { base: SCHOOL_INTRANET_BASE, label: "preferred", step: "正在连接校园网络" },
-        { base: SCHOOL_PUBLIC_BASE, label: "fallback", step: "正在切换备用网络" }
-      ];
+      // 每次手动输入密码都应从全新的教务会话开始。学校会为登录页下发
+      // JSESSIONID 与 route；继续携带上一次退出前的 Cookie 会被某些节点断流。
+      await this.clearSchoolSessionCookies();
+      const routes = this.schoolRoutesByPreference();
       let lastError;
       for (const route of routes) {
         this.schoolBase = route.base;
@@ -1686,6 +1786,19 @@ createApp({
         }
       }
       throw lastError || new Error("教务系统当前无法连接，请稍后再试");
+    },
+    async clearSchoolSessionCookies() {
+      const cookies = window.capacitorExports?.CapacitorCookies;
+      if (!cookies) return;
+      const bases = [SCHOOL_PUBLIC_BASE, SCHOOL_HTTPS_BASE, SCHOOL_INTRANET_BASE];
+      await Promise.all(bases.map(async (base) => {
+        try {
+          await cookies.clearCookies({ url: base });
+        } catch (error) {
+          // Cookie 清理失败不应阻止登录；后续请求仍会走网络层重连保护。
+          console.warn("清理教务会话失败", base, error);
+        }
+      }));
     },
     async authenticateSchoolOnCurrentRoute(credentials, setStep) {
       const endpoints = this.schoolEndpoints();
@@ -2576,6 +2689,29 @@ createApp({
     adjustPeriodDuration(step) {
       this.periodDuration = Math.min(60, Math.max(30, this.periodDuration + step));
       this.tapFeedback();
+    },
+    calculateWeekFromDate(startDateStr) {
+      return calculateCurrentWeekFromStartDate(startDateStr, this.currentWeek);
+    },
+    onSemesterStartDateChange(newDate) {
+      const trimmed = String(newDate || "").trim();
+      if (!trimmed) {
+        this.semesterStartDate = "";
+        localStorage.removeItem(STORAGE.semesterStartDate);
+        this.notify("已清除第一周指定日期");
+        return;
+      }
+      this.semesterStartDate = trimmed;
+      localStorage.setItem(STORAGE.semesterStartDate, trimmed);
+      const calculatedWeek = this.calculateWeekFromDate(trimmed);
+      this.currentWeek = calculatedWeek;
+      this.selectedWeek = calculatedWeek;
+      localStorage.setItem(STORAGE.currentWeek, String(calculatedWeek));
+      localStorage.setItem(STORAGE.selectedWeek, String(calculatedWeek));
+      this.notify(`已将 ${trimmed} 所在周设为第 1 周（当前为第 ${calculatedWeek} 周）`);
+      if (this.reminderEnabled) {
+        this.scheduleCourseReminders().catch(() => {});
+      }
     },
     formatDate(value) {
       const date = new Date(value);

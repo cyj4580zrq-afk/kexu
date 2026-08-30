@@ -432,6 +432,16 @@ body.dark .focus-panel.free-day:active { background: #f1f4f8; color: #131a26; }
 .fallback-import p { color: var(--muted); font-size: 12px; }
 .fallback-import textarea { width: 100%; padding: 12px; resize: vertical; border: 1px solid var(--line); border-radius: 8px; outline: 0; background: var(--surface); color: var(--text); }
 .fallback-import .secondary-button { margin-top: 10px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; clip-path: inset(50%); }
+.pdf-import-block { display: grid; gap: 8px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+.pdf-import-block > strong { font-size: 14px; }
+.pdf-import-block > p { margin: 0; }
+.file-import-button { cursor: pointer; }
+.pdf-import-preview { display: grid; gap: 8px; margin-top: 2px; }
+.pdf-import-preview > p { margin: 0; color: var(--text); }
+.pdf-course-row { display: grid; grid-template-columns: minmax(0, 1fr) 66px 88px 34px; gap: 6px; align-items: center; }
+.pdf-course-row input, .pdf-course-row select { min-width: 0; height: 36px; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--text); font-size: 12px; }
+.pdf-course-row button { display: grid; width: 34px; height: 34px; place-items: center; border: 0; border-radius: 6px; background: var(--red-soft); color: var(--red); }
 
 .history-list { display: grid; gap: 1px; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--line); }
 .history-row { display: grid; grid-template-columns: 40px minmax(0,1fr) auto; align-items: center; gap: 12px; min-height: 88px; padding: 14px; background: var(--surface); }

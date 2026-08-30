@@ -39,7 +39,7 @@
             <span>第 {{ selectedWeek }} 周</span>
             <app-icon name="ChevronDown" :size="15"></app-icon>
           </button>
-          <span>{{ todayLabel }} · {{ todayCourses.length }} 门课</span>
+          <span>{{ todayLabel }} · {{ isPreSemester ? '尚未开课' : `${todayCourses.length} 门课` }}</span>
         </div>
 
         <button v-if="featuredCountdown" type="button" class="home-countdown" @click="openTab('countdowns')">
@@ -94,7 +94,7 @@
             <app-icon name="ChevronRight" :size="17"></app-icon>
           </button>
         </div>
-        <div v-else class="home-empty-line">今天没有更多安排</div>
+        <div v-else class="home-empty-line">{{ isPreSemester ? `尚未开课（第 1 周开学日：${semesterStartDateLabel}），今日暂无课程` : '今天没有更多安排' }}</div>
 
         <button class="all-schedule-button" type="button" @click="openAllCourses">
           <span><app-icon name="CalendarDays" :size="20"></app-icon>查看全部课程</span>
@@ -555,6 +555,11 @@
             <em>第 {{ currentWeek }} 周</em>
             <app-icon name="ChevronRight" :size="18"></app-icon>
           </button>
+          <div class="setting-row reminder-date-row">
+            <span class="setting-icon amber"><app-icon name="CalendarDays" :size="19"></app-icon></span>
+            <span><strong>第一周开学日期</strong><small>{{ semesterStartDate ? `开学日：${semesterStartDate} (${semesterStatusText})` : '指定任意日期为第 1 周开学日' }}</small></span>
+            <input :value="semesterStartDate" type="date" aria-label="第一周指定日期" @change="onSemesterStartDateChange($event.target.value)">
+          </div>
           <div class="setting-row period-setting">
             <span class="setting-icon amber"><app-icon name="Timer" :size="19"></app-icon></span>
             <span><strong>每小节时长</strong><small>小课间 5 分钟，长课间 20 分钟</small></span>
@@ -589,7 +594,7 @@
           <div v-if="reminderEnabled" class="setting-row reminder-date-row">
             <span class="setting-icon amber"><app-icon name="CalendarDays" :size="19"></app-icon></span>
             <span><strong>第一周周一</strong><small>用于计算每门课的实际上课日期</small></span>
-            <input v-model="semesterStartDate" type="date" aria-label="第一周周一日期">
+            <input :value="semesterStartDate" type="date" aria-label="第一周开学日期" @change="onSemesterStartDateChange($event.target.value)">
           </div>
           <div v-if="reminderEnabled" class="setting-row period-setting">
             <span class="setting-icon blue"><app-icon name="ClockAlert" :size="19"></app-icon></span>
